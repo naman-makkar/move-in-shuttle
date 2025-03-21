@@ -1,4 +1,4 @@
-// src/app/admin/routes/[routeId]/update/route.js
+
 import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/dbConnect';
 import Route from '@/models/route';
