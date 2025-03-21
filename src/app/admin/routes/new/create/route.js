@@ -1,21 +1,16 @@
-// src/app/admin/routes/new/create/route.js (Route Handler in Next.js 13)
+// src/app/admin/routes/new/create/route.js
 import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/dbConnect';
 import Route from '@/models/route';
 
 export async function POST(request) {
   try {
-    const { routeName, stops } = await request.json();
+    const { routeName, stops } = await request.json(); // stops is now an array of stop IDs
     await dbConnect();
-
-    let stopsArray = [];
-    if (stops && stops.trim() !== "") {
-      stopsArray = stops.split(",").map((s) => s.trim());
-    }
 
     await Route.create({
       routeName,
-      stops: stopsArray
+      stops, // store the array of stop IDs
     });
 
     return NextResponse.json({ success: true }, { status: 201 });

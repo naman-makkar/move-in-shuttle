@@ -3,7 +3,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-
+export const dynamicParams = false;
 export default function EditRoutePage() {
   const router = useRouter();
   const path = usePathname(); 
@@ -14,6 +14,7 @@ export default function EditRoutePage() {
   const [routeName, setRouteName] = useState("");
   const [stops, setStops] = useState("");
   const [isActive, setIsActive] = useState(true);
+  
 
   // Fetch existing data on mount
   useEffect(() => {

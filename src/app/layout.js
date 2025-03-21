@@ -42,7 +42,10 @@ export default function RootLayout({ children }) {
       <body>
         <nav style={{ padding: '1rem', background: '#eee' }}>
           <a href="/">Home</a> |{' '}
-          <a href="/admin/routes">Admin Routes</a>
+          <a href="/admin/routes">Admin Routes</a> |{" "}
+          <a href="/auth/register">Register</a> |{" "}
+          <a href="/auth/login">Login</a> |{" "}
+          <a href="/dashboard">Dashboard</a>
         </nav>
         {children}
       </body>
