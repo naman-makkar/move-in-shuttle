@@ -12,23 +12,85 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+	AlertCircle,
+	CalendarIcon,
+	Clock,
+	MapPinIcon,
+	Map as MapIcon
+} from 'lucide-react';
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import {
+	GoogleMap,
+	useJsApiLoader,
+	Marker,
+	InfoWindow,
+	DirectionsRenderer
+} from '@react-google-maps/api';
+
+const mapContainerStyle = {
+	width: '100%',
+	height: '300px',
+	borderRadius: '0.5rem'
+};
+
+// Center at Greater Noida
+const center = {
+	lat: 28.4595,
+	lng: 77.5021
+};
+
+// Pre-defined locations for the stops in Greater Noida
+const stopLocations = {
+	'Pari Chowk': { lat: 28.4651, lng: 77.503 },
+	Depot: { lat: 28.4757, lng: 77.5047 },
+	'Bennett University': { lat: 28.4496, lng: 77.5858 },
+	'Delta 1': { lat: 28.4755, lng: 77.5044 }
+};
 
 export default function MyBookingsPage() {
 	const [userId, setUserId] = useState('');
 	const [bookings, setBookings] = useState([]);
 	const [error, setError] = useState('');
+	const [loading, setLoading] = useState(false);
+	const [selectedBooking, setSelectedBooking] = useState(null);
+	const [directionsResponse, setDirectionsResponse] = useState(null);
+	const [showingMap, setShowingMap] = useState(false);
+
+	const { isLoaded } = useJsApiLoader({
+		id: 'google-map-script',
+		googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+		libraries: ['directions']
+	});
 
 	async function fetchBookings() {
 		try {
+			setLoading(true);
 			const res = await fetch(`/api/bookings/my?userId=${userId}`);
 			if (res.ok) {
 				const data = await res.json();
 				setBookings(data);
+				if (data.length === 0) {
+					setError('No bookings found for this user ID');
+				} else {
+					setError('');
+				}
 			} else {
 				setError('Failed to fetch bookings');
 			}
 		} catch (err) {
 			setError('Error fetching bookings');
+		} finally {
+			setLoading(false);
 		}
 	}
 
@@ -66,9 +128,33 @@ export default function MyBookingsPage() {
 		}
 	}
 
+	// Function to show route on map
+	const showRoute = async (booking) => {
+		if (!isLoaded) return;
+
+		setSelectedBooking(booking);
+		setShowingMap(true);
+
+		// Get from and to coordinates from the stopLocations
+		const fromCoords = stopLocations[booking.fromStop];
+		const toCoords = stopLocations[booking.toStop];
+
+		if (fromCoords && toCoords) {
+			const directionsService = new google.maps.DirectionsService();
+
+			const results = await directionsService.route({
+				origin: fromCoords,
+				destination: toCoords,
+				travelMode: google.maps.TravelMode.DRIVING
+			});
+
+			setDirectionsResponse(results);
+		}
+	};
+
 	return (
-		<div className='container mx-auto py-10'>
-			<Card>
+		<div className='container mx-auto py-10 max-w-4xl'>
+			<Card className='border-slate-200 shadow-sm'>
 				<CardHeader>
 					<CardTitle className='text-2xl font-bold'>My Bookings</CardTitle>
 					<CardDescription>
@@ -81,93 +167,170 @@ export default function MyBookingsPage() {
 						className='space-y-4 mb-6'>
 						<div className='grid gap-2'>
 							<Label htmlFor='userId'>User ID</Label>
-							<Input
-								id='userId'
-								type='text'
-								value={userId}
-								onChange={(e) => setUserId(e.target.value)}
-								placeholder='Enter your user ID'
-								required
-							/>
+							<div className='flex gap-2'>
+								<Input
+									id='userId'
+									type='text'
+									value={userId}
+									onChange={(e) => setUserId(e.target.value)}
+									placeholder='Enter your user ID'
+									required
+								/>
+								<Button
+									type='submit'
+									disabled={loading || !userId}>
+									{loading ? 'Loading...' : 'Fetch Bookings'}
+								</Button>
+							</div>
 						</div>
-						<Button
-							type='submit'
-							className='w-full'>
-							Fetch My Bookings
-						</Button>
 					</form>
 
-					{error && <div className='text-destructive mb-4'>{error}</div>}
+					{error && (
+						<Alert
+							variant='destructive'
+							className='mb-6'>
+							<AlertCircle className='h-4 w-4' />
+							<AlertDescription>{error}</AlertDescription>
+						</Alert>
+					)}
 
-					{bookings.length > 0 ? (
-						<div className='rounded-md border'>
-							<div className='space-y-2 divide-y'>
+					{showingMap && selectedBooking && isLoaded && (
+						<div className='mb-6'>
+							<div className='flex justify-between items-center mb-2'>
+								<h3 className='font-medium'>
+									Route Map: {selectedBooking.fromStop} to{' '}
+									{selectedBooking.toStop}
+								</h3>
+								<Button
+									variant='outline'
+									size='sm'
+									onClick={() => setShowingMap(false)}>
+									Hide Map
+								</Button>
+							</div>
+							<div className='border rounded-md overflow-hidden'>
+								<GoogleMap
+									mapContainerStyle={mapContainerStyle}
+									center={center}
+									zoom={12}>
+									{directionsResponse && (
+										<DirectionsRenderer directions={directionsResponse} />
+									)}
+
+									{!directionsResponse && (
+										<>
+											{selectedBooking.fromStop &&
+												stopLocations[selectedBooking.fromStop] && (
+													<Marker
+														position={stopLocations[selectedBooking.fromStop]}
+														icon='https://maps.google.com/mapfiles/ms/icons/green-dot.png'>
+														<InfoWindow>
+															<div>
+																<p className='font-medium text-sm'>
+																	From: {selectedBooking.fromStop}
+																</p>
+															</div>
+														</InfoWindow>
+													</Marker>
+												)}
+
+											{selectedBooking.toStop &&
+												stopLocations[selectedBooking.toStop] && (
+													<Marker
+														position={stopLocations[selectedBooking.toStop]}
+														icon='https://maps.google.com/mapfiles/ms/icons/red-dot.png'>
+														<InfoWindow>
+															<div>
+																<p className='font-medium text-sm'>
+																	To: {selectedBooking.toStop}
+																</p>
+															</div>
+														</InfoWindow>
+													</Marker>
+												)}
+										</>
+									)}
+								</GoogleMap>
+							</div>
+						</div>
+					)}
+
+					{loading ? (
+						<div className='flex justify-center py-8'>
+							<div className='animate-spin rounded-full h-12 w-12 border-b-2 border-slate-800'></div>
+						</div>
+					) : bookings.length > 0 ? (
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Booking Details</TableHead>
+									<TableHead>Route</TableHead>
+									<TableHead>Status</TableHead>
+									<TableHead className='text-right'>Actions</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
 								{bookings.map((b) => (
-									<div
-										key={b.bookingId}
-										className='p-4'>
-										<div className='grid md:grid-cols-2 gap-2'>
-											<div>
-												<p className='text-sm font-medium'>Booking ID</p>
-												<p className='text-sm text-muted-foreground'>
-													{b.bookingId}
-												</p>
+									<TableRow key={b.bookingId}>
+										<TableCell>
+											<div className='font-medium'>{b.shuttleId}</div>
+											<div className='text-sm text-muted-foreground'>
+												ID: {b.bookingId}
 											</div>
-											<div>
-												<p className='text-sm font-medium'>Shuttle</p>
-												<p className='text-sm text-muted-foreground'>
-													{b.shuttleId}
-												</p>
+											<div className='flex items-center gap-1 text-sm text-muted-foreground'>
+												<Clock className='h-3 w-3' />
+												Fare: {b.fare} points
 											</div>
-											<div>
-												<p className='text-sm font-medium'>From</p>
-												<p className='text-sm text-muted-foreground'>
-													{b.fromStop}
-												</p>
+										</TableCell>
+										<TableCell>
+											<div className='flex items-center gap-1'>
+												<MapPinIcon className='h-3 w-3 text-slate-500' />
+												From: {b.fromStop}
 											</div>
-											<div>
-												<p className='text-sm font-medium'>To</p>
-												<p className='text-sm text-muted-foreground'>
-													{b.toStop}
-												</p>
+											<div className='flex items-center gap-1 mt-1'>
+												<MapPinIcon className='h-3 w-3 text-slate-500' />
+												To: {b.toStop}
 											</div>
-											<div>
-												<p className='text-sm font-medium'>Fare</p>
-												<p className='text-sm text-muted-foreground'>
-													{b.fare} points
-												</p>
-											</div>
-											<div>
-												<p className='text-sm font-medium'>Status</p>
-												<span
-													className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-														b.bookingStatus === 'confirmed'
-															? 'bg-green-100 text-green-800'
-															: 'bg-yellow-100 text-yellow-800'
-													}`}>
-													{b.bookingStatus}
-												</span>
-											</div>
-										</div>
-										{b.bookingStatus === 'confirmed' && (
-											<div className='mt-4'>
+											<Button
+												variant='link'
+												size='sm'
+												className='p-0 h-6 mt-1'
+												onClick={() => showRoute(b)}>
+												<MapIcon className='h-3 w-3 mr-1' />
+												View on map
+											</Button>
+										</TableCell>
+										<TableCell>
+											<Badge
+												className={
+													b.bookingStatus === 'confirmed'
+														? 'bg-green-100 text-green-800 hover:bg-green-100'
+														: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+												}>
+												{b.bookingStatus}
+											</Badge>
+										</TableCell>
+										<TableCell className='text-right'>
+											{b.bookingStatus === 'confirmed' && (
 												<Button
 													variant='destructive'
 													size='sm'
 													onClick={() => handleCancelBooking(b.bookingId)}>
-													Cancel Booking
+													Cancel
 												</Button>
-											</div>
-										)}
-									</div>
+											)}
+										</TableCell>
+									</TableRow>
 								))}
-							</div>
+							</TableBody>
+						</Table>
+					) : userId && !loading ? (
+						<div className='text-center py-10 text-muted-foreground'>
+							No bookings found
 						</div>
 					) : (
 						<div className='text-center py-10 text-muted-foreground'>
-							{userId
-								? 'No bookings found'
-								: 'Enter your user ID to fetch bookings'}
+							Enter your user ID to fetch bookings
 						</div>
 					)}
 				</CardContent>

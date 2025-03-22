@@ -76,6 +76,23 @@ export default function Navigation() {
 										<li>
 											<NavigationMenuLink asChild>
 												<Link
+													href='/routes'
+													className={cn(
+														'block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-slate-100 hover:text-slate-900 focus:bg-slate-100 focus:text-slate-900',
+														pathname === '/routes' ? 'bg-slate-100' : ''
+													)}>
+													<div className='text-sm font-medium leading-none text-slate-900'>
+														All Routes
+													</div>
+													<p className='line-clamp-2 text-sm leading-snug text-slate-500'>
+														Explore available shuttle routes on map
+													</p>
+												</Link>
+											</NavigationMenuLink>
+										</li>
+										<li>
+											<NavigationMenuLink asChild>
+												<Link
 													href='/admin/shuttles'
 													className={cn(
 														'block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-slate-100 hover:text-slate-900 focus:bg-slate-100 focus:text-slate-900',
@@ -263,6 +280,9 @@ export default function Navigation() {
 							align='end'
 							className='w-[200px]'>
 							<DropdownMenuLabel>Shuttle Routes</DropdownMenuLabel>
+							<DropdownMenuItem asChild>
+								<Link href='/routes'>All Routes</Link>
+							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
 								<Link href='/admin/shuttles'>Campus Routes</Link>
 							</DropdownMenuItem>

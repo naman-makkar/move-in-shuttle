@@ -16,6 +16,20 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, MapPinIcon, Trash2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+
+const mapContainerStyle = {
+	width: '100%',
+	height: '300px',
+	borderRadius: '0.5rem',
+	marginTop: '1rem',
+	marginBottom: '1rem'
+};
+
+const center = {
+	lat: 28.4595, // Greater Noida approximate center
+	lng: 77.5021
+};
 
 export default function EditStopPage() {
 	const router = useRouter();
@@ -29,6 +43,13 @@ export default function EditStopPage() {
 	const [error, setError] = useState('');
 	const [loading, setLoading] = useState(true);
 	const [submitting, setSubmitting] = useState(false);
+	const [mapCenter, setMapCenter] = useState(center);
+	const [markerPosition, setMarkerPosition] = useState(null);
+
+	const { isLoaded } = useJsApiLoader({
+		id: 'google-map-script',
+		googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
+	});
 
 	useEffect(() => {
 		async function fetchStop() {
@@ -41,9 +62,18 @@ export default function EditStopPage() {
 				}
 				const data = await res.json();
 				setStopName(data.stopName);
-				setLatitude(data.location?.latitude || 0);
-				setLongitude(data.location?.longitude || 0);
+				const lat = data.location?.latitude || 0;
+				const lng = data.location?.longitude || 0;
+				setLatitude(lat);
+				setLongitude(lng);
 				setIsActive(data.isActive);
+
+				// Set map center and marker if coordinates are valid
+				if (lat && lng) {
+					const position = { lat: Number(lat), lng: Number(lng) };
+					setMapCenter(position);
+					setMarkerPosition(position);
+				}
 			} catch (err) {
 				setError('Error fetching stop');
 			} finally {
@@ -52,6 +82,18 @@ export default function EditStopPage() {
 		}
 		fetchStop();
 	}, [stopId]);
+
+	useEffect(() => {
+		// Update marker position when latitude or longitude changes
+		if (latitude && longitude) {
+			const newPosition = {
+				lat: Number(latitude),
+				lng: Number(longitude)
+			};
+			setMarkerPosition(newPosition);
+			setMapCenter(newPosition);
+		}
+	}, [latitude, longitude]);
 
 	async function handleUpdate(e) {
 		e.preventDefault();
@@ -105,6 +147,14 @@ export default function EditStopPage() {
 		}
 	}
 
+	const handleMapClick = (e) => {
+		const clickedLat = e.latLng.lat();
+		const clickedLng = e.latLng.lng();
+		setLatitude(clickedLat);
+		setLongitude(clickedLng);
+		setMarkerPosition({ lat: clickedLat, lng: clickedLng });
+	};
+
 	return (
 		<div className='container mx-auto py-10 max-w-md'>
 			<Card className='border-slate-200 shadow-sm'>
@@ -136,31 +186,57 @@ export default function EditStopPage() {
 								/>
 							</div>
 
-							<div className='grid gap-2'>
-								<Label htmlFor='latitude'>Latitude</Label>
-								<Input
-									id='latitude'
-									type='number'
-									step='any'
-									value={latitude}
-									onChange={(e) => setLatitude(e.target.value)}
-									placeholder='e.g. 37.7749'
-									required
-								/>
+							<div className='grid grid-cols-2 gap-4'>
+								<div className='grid gap-2'>
+									<Label htmlFor='latitude'>Latitude</Label>
+									<Input
+										id='latitude'
+										type='number'
+										step='any'
+										value={latitude}
+										onChange={(e) => setLatitude(e.target.value)}
+										placeholder='e.g. 28.4595'
+										required
+									/>
+								</div>
+
+								<div className='grid gap-2'>
+									<Label htmlFor='longitude'>Longitude</Label>
+									<Input
+										id='longitude'
+										type='number'
+										step='any'
+										value={longitude}
+										onChange={(e) => setLongitude(e.target.value)}
+										placeholder='e.g. 77.5021'
+										required
+									/>
+								</div>
 							</div>
 
-							<div className='grid gap-2'>
-								<Label htmlFor='longitude'>Longitude</Label>
-								<Input
-									id='longitude'
-									type='number'
-									step='any'
-									value={longitude}
-									onChange={(e) => setLongitude(e.target.value)}
-									placeholder='e.g. -122.4194'
-									required
-								/>
-							</div>
+							{isLoaded ? (
+								<div className='mt-4'>
+									<Label className='mb-2 block'>
+										Location on Map (Click to update)
+									</Label>
+									<div className='border rounded-md overflow-hidden'>
+										<GoogleMap
+											mapContainerStyle={mapContainerStyle}
+											center={mapCenter}
+											zoom={14}
+											onClick={handleMapClick}>
+											{markerPosition && <Marker position={markerPosition} />}
+										</GoogleMap>
+									</div>
+									<p className='text-xs text-muted-foreground mt-1'>
+										Click on the map to update the coordinates
+									</p>
+								</div>
+							) : (
+								<div className='p-4 bg-slate-100 rounded-md text-center'>
+									Loading map...
+								</div>
+							)}
 
 							<div className='flex items-center space-x-2'>
 								<Checkbox
