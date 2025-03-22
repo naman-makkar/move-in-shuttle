@@ -61,7 +61,7 @@ export default function Navigation() {
 					href='/'
 					className='flex items-center space-x-2 font-medium text-xl text-slate-800'>
 					<CarIcon className='h-5 w-5 text-slate-800' />
-					<span>University Shuttle</span>
+					<span>Move in Shuttle</span>
 				</Link>
 
 				<div className='hidden md:flex'>
