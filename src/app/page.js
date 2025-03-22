@@ -389,7 +389,7 @@ export default function HomePage() {
 							<span className='font-bold'>Shuttle Management System</span>
 						</div>
 						<div className='text-sm text-gray-500'>
-							© 2023 Shuttle Management System. All rights reserved.
+							© 2025 Shuttle Management System. All rights reserved.
 						</div>
 					</div>
 				</div>
