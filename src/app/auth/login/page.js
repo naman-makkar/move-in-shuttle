@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -14,21 +15,17 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
 
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
+    const res = await signIn("credentials", {
+      redirect: false,
+      email,
+      password,
     });
-    const data = await res.json();
-    if (res.ok) {
-      // Redirect based on role:
-      if (data.user.role === "admin") {
-        router.push("/admin/users");
-      } else {
-        router.push("/dashboard");
-      }
+
+    if (res.error) {
+      setError(res.error);
     } else {
-      setError(data.error || "Login failed");
+      // If signIn is successful, redirect based on role or to a default page
+      router.push("/dashboard");
     }
   }
 
@@ -39,11 +36,21 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit}>
         <div>
           <label>Email: </label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input 
+            type="email" 
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required 
+          />
         </div>
         <div>
           <label>Password: </label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <input 
+            type="password" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required 
+          />
         </div>
         <button type="submit">Login</button>
       </form>
