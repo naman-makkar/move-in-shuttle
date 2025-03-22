@@ -16,7 +16,7 @@ export default function EditUserPage() {
 
   useEffect(() => {
     async function fetchUser() {
-      const res = await fetch(`/api/admin/users/${userId}`);
+      const res = await fetch(`/api/user/${userId}`);
       if (!res.ok) return;
       const data = await res.json();
       if (data) {
@@ -31,7 +31,7 @@ export default function EditUserPage() {
   async function handleUpdate(e) {
     e.preventDefault();
     setError("");
-    const res = await fetch(`/api/admin/users/${userId}`, {
+    const res = await fetch(`/api/user/${userId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ walletBalance, role })
