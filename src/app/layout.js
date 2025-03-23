@@ -2,6 +2,7 @@ import './globals.css'; // if you have global styles
 import { Inter } from 'next/font/google';
 import Navigation from '@/components/navigation';
 import { cn } from '@/lib/utils';
+import SessionProviderWrapper from '@/components/sessionProviderWrapper';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -11,7 +12,7 @@ export const metadata = {
 };
 
 // This function gets called for each request/page load
-export default function RootLayout({ children }) {
+export default function RootLayout({ children, session }) {
 	return (
 		<html
 			lang='en'
@@ -22,8 +23,10 @@ export default function RootLayout({ children }) {
 					inter.className
 				)}>
 				<div className='relative flex min-h-screen flex-col'>
-					<Navigation />
-					<main className='flex-1'>{children}</main>
+					<SessionProviderWrapper session={session}>
+						<Navigation />
+						<main className='flex-1'>{children}</main>
+					</SessionProviderWrapper>
 				</div>
 			</body>
 		</html>

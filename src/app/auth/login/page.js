@@ -1,7 +1,7 @@
-// src/app/auth/login/page.js
 'use client';
 
 import { useState } from 'react';
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -29,31 +29,17 @@ export default function LoginPage() {
 		setIsLoading(true);
 
 		try {
-			// Basic validation
-			if (!email || !password) {
-				setError('Email and password are required');
-				setIsLoading(false);
-				return;
-			}
-
-			// Call the API login endpoint
-			const response = await fetch('/api/auth/login', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ email, password })
+			const res = await signIn('credentials', {
+				redirect: false,
+				email,
+				password
 			});
 
-			const data = await response.json();
-
-			if (!response.ok) {
-				setError(data.error || 'Login failed');
-				return;
+			if (res.error) {
+				setError(res.error);
+			} else {
+				router.push('/dashboard');
 			}
-
-			// Successful login - redirect to dashboard
-			router.push('/dashboard');
 		} catch (error) {
 			setError('An unexpected error occurred. Please try again.');
 		} finally {

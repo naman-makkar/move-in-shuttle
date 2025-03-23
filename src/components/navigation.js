@@ -1,6 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import LogoutButton from '@/components/logoutButton';
 import { Button } from '@/components/ui/button';
 import {
 	DropdownMenu,
@@ -31,28 +33,11 @@ import {
 	ClipboardListIcon,
 	WalletIcon
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
 
 export default function Navigation() {
-	// Temporary authentication placeholder (remove NextAuth dependency)
-	const [isAuthenticated, setIsAuthenticated] = useState(false);
-	const [user, setUser] = useState(null);
+	const { data: session } = useSession();
 	const pathname = usePathname();
-	const [walletBalance, setWalletBalance] = useState(0);
-
-	// For demo purposes, you can toggle authentication state
-	const login = () => {
-		setIsAuthenticated(true);
-		setUser({ name: 'Student', role: 'user' });
-	};
-
-	const logout = () => {
-		setIsAuthenticated(false);
-		setUser(null);
-	};
-
-	// Simulated role for testing
-	const isAdmin = user?.role === 'admin';
+	const isAdmin = session?.user?.role === 'admin';
 
 	return (
 		<header className='sticky top-0 z-50 w-full border-b border-slate-200 bg-white'>
@@ -324,25 +309,20 @@ export default function Navigation() {
 				</div>
 
 				<div className='flex items-center gap-2'>
-					{isAuthenticated ? (
+					{session ? (
 						<div className='flex items-center gap-2'>
 							<div className='flex flex-col items-end'>
 								<span className='text-sm text-slate-700'>
-									Hi, {user?.name || 'Student'}
+									Hi, {session.user.name || 'Student'}
 								</span>
-								{walletBalance !== null && (
+								{session.user.userId && (
 									<span className='text-xs text-slate-500 flex items-center'>
-										<WalletIcon className='h-3 w-3 mr-1' /> ₹{walletBalance}
+										<WalletIcon className='h-3 w-3 mr-1' /> ID:{' '}
+										{session.user.userId}
 									</span>
 								)}
 							</div>
-							<Button
-								variant='ghost'
-								size='sm'
-								className='text-slate-700'
-								onClick={logout}>
-								Logout
-							</Button>
+							<LogoutButton />
 						</div>
 					) : (
 						<div className='flex gap-2'>
