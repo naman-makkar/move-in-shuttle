@@ -228,7 +228,7 @@ export default function Navigation() {
 											navigationMenuTriggerStyle(),
 											'text-slate-700'
 										)}>
-										Schedule
+										Dashboard
 									</NavigationMenuLink>
 								</Link>
 							</NavigationMenuItem>
