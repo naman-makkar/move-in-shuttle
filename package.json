@@ -41,7 +41,8 @@
     "date-fns": "3.3.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "cmdk": "1.0.0",  
+    "cmdk": "1.0.0",
+    "date-fns": "3.3.1", 
     "next-auth": "^4.24.11",
     "embla-carousel-react": "^8.5.2",
     "input-otp": "^1.4.2",
@@ -49,6 +50,7 @@
     "mongodb": "^6.15.0",
     "mongoose": "^8.12.1",
     "next": "14.2.2",
+    "next-auth": "^4.24.11",
     "next-themes": "^0.4.6",
     "react": "^18.0.0",
     "react-day-picker": "8.10.1",
@@ -61,7 +63,8 @@
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.1.0",
     "vaul": "^1.1.2",
-    "zod": "^3.24.2"
+    "zod": "^3.24.2",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

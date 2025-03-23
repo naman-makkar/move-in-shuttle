@@ -72,7 +72,7 @@ export default function MyBookingsPage() {
 	const { isLoaded } = useJsApiLoader({
 		id: 'google-map-script',
 		googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-		libraries: ['directions']
+		libraries: ["maps", "directions"]
 	});
 
 	// Fetch bookings when session is loaded
@@ -90,7 +90,9 @@ export default function MyBookingsPage() {
 
 		try {
 			setLoading(true);
-			const res = await fetch(`/api/bookings/my?userId=${session.user.userId}`);
+			const userIdEncoded = encodeURIComponent(session.user.userId);
+			const res = await fetch(`/api/bookings/my/${userIdEncoded}`);
+
 			if (res.ok) {
 				const data = await res.json();
 				setBookings(data);

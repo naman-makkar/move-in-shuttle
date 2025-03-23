@@ -1,13 +1,12 @@
-//src/app/api/bookings/my/route.js
-import { NextResponse } from "next/server";
-import { dbConnect } from "@/lib/dbConnect";
-import Booking from "@/models/booking";
+// src/app/api/bookings/my/[userId]/route.js
+import { NextResponse } from 'next/server';
+import { dbConnect } from '@/lib/dbConnect';
+import Booking from '@/models/booking';
 
-export async function GET(request) {
+export async function GET(_request, { params }) {
   try {
     await dbConnect();
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
+    const { userId } = params;
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
