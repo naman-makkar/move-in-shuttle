@@ -1,6 +1,7 @@
 //src/app/bookings/my/page.js
 'use client';
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import {
 	Card,
 	CardHeader,
@@ -18,7 +19,9 @@ import {
 	CalendarIcon,
 	Clock,
 	MapPinIcon,
-	Map as MapIcon
+	Map as MapIcon,
+	UserIcon,
+	RefreshCwIcon
 } from 'lucide-react';
 import {
 	Table,
@@ -58,7 +61,7 @@ const stopLocations = {
 };
 
 export default function MyBookingsPage() {
-	const [userId, setUserId] = useState('');
+	const { data: session, status } = useSession();
 	const [bookings, setBookings] = useState([]);
 	const [error, setError] = useState('');
 	const [loading, setLoading] = useState(false);
@@ -72,15 +75,27 @@ export default function MyBookingsPage() {
 		libraries: ['directions']
 	});
 
+	// Fetch bookings when session is loaded
+	useEffect(() => {
+		if (status === 'authenticated' && session?.user?.userId) {
+			fetchBookings();
+		}
+	}, [status, session]);
+
 	async function fetchBookings() {
+		if (status !== 'authenticated' || !session?.user?.userId) {
+			setError('Please sign in to view your bookings');
+			return;
+		}
+
 		try {
 			setLoading(true);
-			const res = await fetch(`/api/bookings/my?userId=${userId}`);
+			const res = await fetch(`/api/bookings/my?userId=${session.user.userId}`);
 			if (res.ok) {
 				const data = await res.json();
 				setBookings(data);
 				if (data.length === 0) {
-					setError('No bookings found for this user ID');
+					setError('No bookings found for your account');
 				} else {
 					setError('');
 				}
@@ -94,24 +109,16 @@ export default function MyBookingsPage() {
 		}
 	}
 
-	function handleFetch(e) {
-		e.preventDefault();
-		if (userId) {
-			fetchBookings();
-		}
-	}
-
 	// Define the handleCancelBooking function
 	async function handleCancelBooking(bookingId) {
 		if (!confirm('Are you sure you want to cancel this booking?')) return;
 
 		try {
-			// For testing, we prompt for userId; later, use session info.
-			const currentUserId = prompt('Enter your userId for cancellation:');
+			setLoading(true);
 			const res = await fetch('/api/bookings/cancel', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ bookingId, userId: currentUserId })
+				body: JSON.stringify({ bookingId, userId: session.user.userId })
 			});
 			const data = await res.json();
 			if (res.ok) {
@@ -125,6 +132,8 @@ export default function MyBookingsPage() {
 			}
 		} catch (error) {
 			alert('Error cancelling booking: ' + error);
+		} finally {
+			setLoading(false);
 		}
 	}
 
@@ -152,6 +161,15 @@ export default function MyBookingsPage() {
 		}
 	};
 
+	// Show loading state while session is loading
+	if (status === 'loading') {
+		return (
+			<div className='container mx-auto py-10 max-w-4xl text-center'>
+				<p>Loading booking information...</p>
+			</div>
+		);
+	}
+
 	return (
 		<div className='container mx-auto py-10 max-w-4xl'>
 			<Card className='border-slate-200 shadow-sm'>
@@ -162,28 +180,37 @@ export default function MyBookingsPage() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<form
-						onSubmit={handleFetch}
-						className='space-y-4 mb-6'>
-						<div className='grid gap-2'>
-							<Label htmlFor='userId'>User ID</Label>
-							<div className='flex gap-2'>
-								<Input
-									id='userId'
-									type='text'
-									value={userId}
-									onChange={(e) => setUserId(e.target.value)}
-									placeholder='Enter your user ID'
-									required
-								/>
-								<Button
-									type='submit'
-									disabled={loading || !userId}>
-									{loading ? 'Loading...' : 'Fetch Bookings'}
-								</Button>
+					{status === 'unauthenticated' ? (
+						<Alert
+							variant='destructive'
+							className='mb-6'>
+							<AlertDescription>
+								Please sign in to view your bookings
+							</AlertDescription>
+						</Alert>
+					) : (
+						<div className='flex justify-between items-center mb-6'>
+							<div className='flex items-center gap-3'>
+								<UserIcon className='h-5 w-5 text-slate-700' />
+								<div>
+									<div className='font-medium'>
+										{session.user.name || 'Student'}
+									</div>
+									<div className='text-sm text-slate-500'>
+										ID: {session.user.userId}
+									</div>
+								</div>
 							</div>
+							<Button
+								variant='outline'
+								size='sm'
+								onClick={fetchBookings}
+								disabled={loading}>
+								<RefreshCwIcon className='h-4 w-4 mr-1' />
+								Refresh
+							</Button>
 						</div>
-					</form>
+					)}
 
 					{error && (
 						<Alert
@@ -324,13 +351,13 @@ export default function MyBookingsPage() {
 								))}
 							</TableBody>
 						</Table>
-					) : userId && !loading ? (
+					) : status === 'authenticated' ? (
 						<div className='text-center py-10 text-muted-foreground'>
-							No bookings found
+							No bookings found for your account
 						</div>
 					) : (
 						<div className='text-center py-10 text-muted-foreground'>
-							Enter your user ID to fetch bookings
+							Sign in to view your bookings
 						</div>
 					)}
 				</CardContent>

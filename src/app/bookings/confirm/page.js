@@ -2,6 +2,7 @@
 'use client';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import {
 	Card,
 	CardContent,
@@ -26,12 +27,12 @@ import { Badge } from '@/components/ui/badge';
 
 export default function BookingConfirmPage() {
 	const router = useRouter();
+	const { data: session, status } = useSession();
 	const searchParams = useSearchParams();
 	const shuttleId = searchParams.get('shuttleId');
 	const fromStop = searchParams.get('fromStop');
 	const toStop = searchParams.get('toStop');
 	const fare = searchParams.get('fare');
-	const [userId, setUserId] = useState('');
 	const [message, setMessage] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 	const [success, setSuccess] = useState(false);
@@ -59,8 +60,8 @@ export default function BookingConfirmPage() {
 	}, [fromStop, toStop]);
 
 	async function handleConfirm() {
-		if (!userId) {
-			setMessage('Please enter your user ID to proceed');
+		if (status !== 'authenticated' || !session?.user?.userId) {
+			setMessage('Please sign in to confirm your booking');
 			return;
 		}
 
@@ -72,7 +73,7 @@ export default function BookingConfirmPage() {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					userId,
+					userId: session.user.userId,
 					shuttleId,
 					fromStop,
 					toStop,
@@ -95,13 +96,21 @@ export default function BookingConfirmPage() {
 			setIsLoading(false);
 		}
 	}
-
 	function handleBackClick() {
 		router.back();
 	}
 
 	function handleViewBookings() {
-		router.push('/bookings/history');
+		router.push('/bookings/my');
+	}
+
+	// Show loading state while session is loading
+	if (status === 'loading') {
+		return (
+			<div className='container mx-auto px-4 py-8 max-w-4xl text-center'>
+				<p>Loading booking information...</p>
+			</div>
+		);
 	}
 
 	return (
@@ -247,30 +256,32 @@ export default function BookingConfirmPage() {
 							</div>
 						</div>
 
-						<div className='space-y-2'>
-							<Label
-								htmlFor='userId'
-								className='flex items-center gap-2'>
-								<UserIcon className='h-4 w-4' />
-								Your User ID
-							</Label>
-							<Input
-								id='userId'
-								type='text'
-								placeholder='Enter your user ID'
-								value={userId}
-								onChange={(e) => setUserId(e.target.value)}
-							/>
-							<p className='text-xs text-slate-500'>
-								For testing purposes only. Enter any user ID to proceed.
-							</p>
-						</div>
+						{status === 'authenticated' ? (
+							<div className='border border-slate-200 rounded-lg p-4'>
+								<div className='flex items-center gap-2'>
+									<UserIcon className='h-5 w-5 text-slate-500' />
+									<div>
+										<div className='text-sm text-slate-500'>User ID</div>
+										<div className='font-medium'>{session.user.userId}</div>
+										<div className='text-xs text-slate-500'>
+											{session.user.name || 'Student'}
+										</div>
+									</div>
+								</div>
+							</div>
+						) : (
+							<Alert className='bg-yellow-50 border-yellow-200'>
+								<AlertDescription>
+									Please sign in to continue with your booking.
+								</AlertDescription>
+							</Alert>
+						)}
 					</CardContent>
 					<CardFooter className='flex flex-col gap-3'>
 						<Button
 							className='w-full bg-slate-800 hover:bg-slate-700'
 							onClick={handleConfirm}
-							disabled={isLoading}>
+							disabled={isLoading || status !== 'authenticated'}>
 							{isLoading ? 'Processing...' : 'Confirm Booking'}
 						</Button>
 						<Button

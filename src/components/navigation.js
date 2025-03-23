@@ -195,7 +195,7 @@ export default function Navigation() {
 												</Link>
 											</NavigationMenuLink>
 										</li>
-										<li>
+										{/* <li>
 											<NavigationMenuLink asChild>
 												<Link
 													href='/bookings/cancel'
@@ -213,7 +213,7 @@ export default function Navigation() {
 													</p>
 												</Link>
 											</NavigationMenuLink>
-										</li>
+										</li> */}
 									</ul>
 								</NavigationMenuContent>
 							</NavigationMenuItem>
@@ -243,7 +243,7 @@ export default function Navigation() {
 											navigationMenuTriggerStyle(),
 											'text-slate-700'
 										)}>
-										Student ID
+										Wallet
 									</NavigationMenuLink>
 								</Link>
 							</NavigationMenuItem>
