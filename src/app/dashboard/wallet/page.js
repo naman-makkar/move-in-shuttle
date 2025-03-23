@@ -69,9 +69,8 @@ export default function WalletPage() {
 			setWalletBalance(data.walletBalance);
 
 			// 2) Fetch transaction logs
-			res = await fetch(
-				`/api/user/wallet/transactions?userId=${session.user.userId}`
-			);
+			res = await fetch(`/api/user/wallet/transactions/${encodeURIComponent(session.user.userId)}`);
+
 			data = await res.json();
 			if (!res.ok) {
 				setError(data.error || 'Failed to fetch transactions');

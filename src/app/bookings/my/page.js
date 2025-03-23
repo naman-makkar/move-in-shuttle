@@ -90,7 +90,9 @@ export default function MyBookingsPage() {
 
 		try {
 			setLoading(true);
-			const res = await fetch(`/api/bookings/my?userId=${session.user.userId}`);
+			const userIdEncoded = encodeURIComponent(session.user.userId);
+			const res = await fetch(`/api/bookings/my/${userIdEncoded}`);
+
 			if (res.ok) {
 				const data = await res.json();
 				setBookings(data);

@@ -62,8 +62,9 @@ export default function BookingRequestPage() {
 		}
 		// Redirect to shuttle search results with selected criteria as query parameters
 		router.push(
-			`/bookings/search?fromStop=${fromStop}&toStop=${toStop}&shift=${shift}&day=${day}`
-		);
+			`/bookings/search/${encodeURIComponent(fromStop)}/${encodeURIComponent(toStop)}/${encodeURIComponent(shift)}/${encodeURIComponent(day)}`
+		  );
+		  
 	}
 
 	return (
