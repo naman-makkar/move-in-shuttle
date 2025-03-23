@@ -1,4 +1,4 @@
-//src/app/api/bookings/confirm/route.js
+// src/app/api/bookings/confirm/route.js
 import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/dbConnect';
 import Booking from '@/models/booking';
@@ -33,6 +33,7 @@ export async function POST(request) {
     user.walletBalance -= fare;
     await user.save();
     
+    // Create transaction record
     await Transaction.create({
       userId: user.userId,
       amount: -fare,

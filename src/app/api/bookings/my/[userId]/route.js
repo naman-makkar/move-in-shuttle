@@ -1,3 +1,4 @@
+// src/app/api/bookings/my/[userId]/route.js
 import { NextResponse } from 'next/server';
 import { dbConnect } from '@/lib/dbConnect';
 import Booking from '@/models/booking';
