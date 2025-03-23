@@ -299,10 +299,10 @@ export default function Navigation() {
 
 							<DropdownMenuSeparator />
 							<DropdownMenuItem asChild>
-								<Link href='/dashboard'>Schedule</Link>
+								<Link href='/dashboard'>Dashboard</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
-								<Link href='/dashboard/wallet'>Student ID</Link>
+								<Link href='/dashboard/wallet'>Wallet</Link>
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
