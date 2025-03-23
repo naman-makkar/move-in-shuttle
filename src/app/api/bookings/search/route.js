@@ -1,11 +1,15 @@
-import { NextResponse } from 'next/server';
-import { dbConnect } from '@/lib/dbConnect';
-import Shuttle from '@/models/shuttle';
+// src/app/api/bookings/search/route.js
+export const dynamic = "force-dynamic";
+
+import { NextResponse } from "next/server";
+import { dbConnect } from "@/lib/dbConnect";
+import Shuttle from "@/models/shuttle";
 
 export async function GET(request) {
   try {
     await dbConnect();
-    const { searchParams } = new URL(request.url);
+    // Use Next.js's built-in nextUrl instead of creating a new URL
+    const { searchParams } = request.nextUrl;
     const fromStop = searchParams.get("fromStop");
     const toStop = searchParams.get("toStop");
     const shift = searchParams.get("shift");
@@ -22,7 +26,7 @@ export async function GET(request) {
     const shuttles = await Shuttle.find({
       shift,
       departureTime: { $gt: now },
-      isActive: true
+      isActive: true,
     }).lean();
 
     const availableShuttles = shuttles
@@ -36,7 +40,7 @@ export async function GET(request) {
         const stops = shuttle.stops;
         const fromIndex = stops.findIndex((s) => s.stopId === fromStop);
         const toIndex = stops.findIndex((s) => s.stopId === toStop);
-        // Simple fare calculation
+        // Calculate fare as (toIndex - fromIndex) * 10
         const fare = (toIndex - fromIndex) * 10;
         return {
           shuttleId: shuttle.shuttleId,
