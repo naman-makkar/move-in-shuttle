@@ -38,4 +38,4 @@ StopSchema.pre("save", function (next) {
   next();
 });
 
-export default mongoose.models.Stop || mongoose.model("Stop", StopSchema);
+export default mongoose.models.Stop || mongoose.model('Stop', StopSchema);
