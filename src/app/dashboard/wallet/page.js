@@ -1,6 +1,7 @@
 // src/app/dashboard/wallet/page.js
 'use client';
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import {
 	Card,
 	CardContent,
@@ -31,7 +32,7 @@ import {
 } from 'lucide-react';
 
 export default function WalletPage() {
-	const [userId, setUserId] = useState('');
+	const { data: session, status } = useSession();
 	const [walletBalance, setWalletBalance] = useState(null);
 	const [transactions, setTransactions] = useState([]);
 	const [rechargeAmount, setRechargeAmount] = useState(100);
@@ -39,18 +40,26 @@ export default function WalletPage() {
 	const [loading, setLoading] = useState(false);
 	const [rechargeSuccess, setRechargeSuccess] = useState(false);
 
-	// Fetch wallet balance and transactions once userId is set
+	// Fetch wallet balance and transactions when session is loaded
+	useEffect(() => {
+		if (status === 'authenticated' && session?.user?.userId) {
+			fetchWalletInfo();
+		}
+	}, [status, session]);
+
+	// Fetch wallet balance and transactions
 	async function fetchWalletInfo() {
-		setError('');
-		setLoading(true);
-		if (!userId) {
-			setLoading(false);
+		if (status !== 'authenticated' || !session?.user?.userId) {
+			setError('Please sign in to view your wallet');
 			return;
 		}
 
+		setError('');
+		setLoading(true);
+
 		try {
 			// 1) Fetch wallet balance
-			let res = await fetch(`/api/user/wallet?userId=${userId}`);
+			let res = await fetch(`/api/user/wallet?userId=${session.user.userId}`);
 			let data = await res.json();
 			if (!res.ok) {
 				setError(data.error || 'Failed to fetch wallet balance');
@@ -60,7 +69,9 @@ export default function WalletPage() {
 			setWalletBalance(data.walletBalance);
 
 			// 2) Fetch transaction logs
-			res = await fetch(`/api/user/wallet/transactions?userId=${userId}`);
+			res = await fetch(
+				`/api/user/wallet/transactions?userId=${session.user.userId}`
+			);
 			data = await res.json();
 			if (!res.ok) {
 				setError(data.error || 'Failed to fetch transactions');
@@ -82,8 +93,8 @@ export default function WalletPage() {
 		setError('');
 		setRechargeSuccess(false);
 
-		if (!userId) {
-			setError('Please enter your user ID first');
+		if (!session?.user?.userId) {
+			setError('Please sign in to recharge your wallet');
 			return;
 		}
 
@@ -97,7 +108,10 @@ export default function WalletPage() {
 			const res = await fetch('/api/user/wallet/recharge', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ userId, amount: Number(rechargeAmount) })
+				body: JSON.stringify({
+					userId: session.user.userId,
+					amount: Number(rechargeAmount)
+				})
 			});
 
 			const data = await res.json();
@@ -115,11 +129,6 @@ export default function WalletPage() {
 		} finally {
 			setLoading(false);
 		}
-	}
-
-	function handleSubmitUserId(e) {
-		e.preventDefault();
-		fetchWalletInfo();
 	}
 
 	function getTransactionTypeDetails(type) {
@@ -151,6 +160,30 @@ export default function WalletPage() {
 		}
 	}
 
+	// Show loading state while session is loading
+	if (status === 'loading') {
+		return (
+			<div className='container mx-auto px-4 py-8 max-w-4xl text-center'>
+				<p>Loading wallet information...</p>
+			</div>
+		);
+	}
+
+	// Show error if not authenticated
+	if (status === 'unauthenticated') {
+		return (
+			<div className='container mx-auto px-4 py-8 max-w-4xl'>
+				<Alert
+					variant='destructive'
+					className='mb-6'>
+					<AlertDescription>
+						Please sign in to view your wallet
+					</AlertDescription>
+				</Alert>
+			</div>
+		);
+	}
+
 	return (
 		<div className='container mx-auto px-4 py-8 max-w-4xl'>
 			<h1 className='text-3xl font-bold mb-6 text-center'>My Campus Wallet</h1>
@@ -172,47 +205,36 @@ export default function WalletPage() {
 				</Alert>
 			)}
 
-			{/* Step 1: Enter userId (for testing) */}
+			{/* User ID Display */}
 			<Card className='border-slate-200 shadow-sm mb-6'>
-				<CardHeader>
-					<CardTitle>User Identification</CardTitle>
-					<CardDescription>
-						Enter your user ID to view and manage your wallet
-					</CardDescription>
+				<CardHeader className='pb-2'>
+					<CardTitle>User Information</CardTitle>
 				</CardHeader>
 				<CardContent>
-					<form onSubmit={handleSubmitUserId}>
-						<div className='flex flex-col md:flex-row gap-4'>
-							<div className='flex-grow space-y-2'>
-								<Label
-									htmlFor='userId'
-									className='flex items-center gap-2'>
-									<UserIcon className='h-4 w-4' />
-									User ID
-								</Label>
-								<Input
-									id='userId'
-									type='text'
-									value={userId}
-									onChange={(e) => setUserId(e.target.value)}
-									placeholder='Enter your user ID'
-									required
-								/>
+					<div className='flex items-center gap-3'>
+						<UserIcon className='h-5 w-5 text-slate-700' />
+						<div>
+							<div className='font-medium'>
+								{session.user.name || 'Student'}
 							</div>
-							<div className='flex items-end'>
-								<Button
-									type='submit'
-									className='bg-slate-800 hover:bg-slate-700 w-full md:w-auto'
-									disabled={loading}>
-									{loading ? 'Loading...' : 'Load Wallet'}
-								</Button>
+							<div className='text-sm text-slate-500'>
+								ID: {session.user.userId}
 							</div>
 						</div>
-					</form>
+						<Button
+							variant='outline'
+							size='sm'
+							onClick={fetchWalletInfo}
+							disabled={loading}
+							className='ml-auto'>
+							<RefreshCwIcon className='h-4 w-4 mr-1' />
+							Refresh
+						</Button>
+					</div>
 				</CardContent>
 			</Card>
 
-			{/* Step 2: Wallet info */}
+			{/* Wallet info */}
 			{walletBalance !== null && (
 				<div className='grid grid-cols-1 md:grid-cols-3 gap-6 mb-6'>
 					<Card className='border-slate-200 shadow-sm col-span-1'>
@@ -273,7 +295,7 @@ export default function WalletPage() {
 				</div>
 			)}
 
-			{/* Step 3: Transaction logs */}
+			{/* Transaction logs */}
 			{walletBalance !== null && (
 				<Card className='border-slate-200 shadow-sm'>
 					<CardHeader>
