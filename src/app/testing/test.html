@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Map Testing</title>
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <!-- Leaflet JavaScript -->
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <!-- Leaflet Routing Machine CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"
+    />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1rem;
+      }
+      .heading {
+        margin-bottom: 1rem;
+      }
+      .map-container {
+        flex: 1;
+        position: relative;
+        min-height: 400px;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        margin-bottom: 1rem;
+      }
+      #map {
+        width: 100%;
+        height: 100%;
+      }
+      .controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      .form-section {
+        padding: 1rem;
+        background-color: #f3f4f6;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      .form-row {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 0.5rem;
+      }
+      input,
+      select,
+      button {
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        border: 1px solid #ccc;
+      }
+      button {
+        background-color: #3b82f6;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      button:hover {
+        background-color: #2563eb;
+      }
+      .radio-group {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      .radio-label {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="heading">Map Testing</h1>
+
+      <!-- Location selection form -->
+      <div class="form-section">
+        <h2>Location Settings</h2>
+
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="location-type" value="pickup" checked />
+            Setting Pickup
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="location-type" value="dropoff" />
+            Setting Dropoff
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label for="pickup-address">Pickup Address</label>
+          <input type="text" id="pickup-address" placeholder="Pickup address" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pickup-lat">Pickup Latitude</label>
+            <input
+              type="number"
+              id="pickup-lat"
+              step="0.000001"
+              placeholder="Latitude"
+            />
+          </div>
+          <div class="form-group">
+            <label for="pickup-lng">Pickup Longitude</label>
+            <input
+              type="number"
+              id="pickup-lng"
+              step="0.000001"
+              placeholder="Longitude"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="dropoff-address">Dropoff Address</label>
+          <input
+            type="text"
+            id="dropoff-address"
+            placeholder="Dropoff address"
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="dropoff-lat">Dropoff Latitude</label>
+            <input
+              type="number"
+              id="dropoff-lat"
+              step="0.000001"
+              placeholder="Latitude"
+            />
+          </div>
+          <div class="form-group">
+            <label for="dropoff-lng">Dropoff Longitude</label>
+            <input
+              type="number"
+              id="dropoff-lng"
+              step="0.000001"
+              placeholder="Longitude"
+            />
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="update-map">Update Map</button>
+          <button id="clear-all">Clear All</button>
+        </div>
+
+        <p>
+          <small
+            >Click on the map to set pickup/dropoff locations based on selected
+            mode</small
+          >
+        </p>
+      </div>
+
+      <!-- Map container -->
+      <div class="map-container">
+        <div id="map"></div>
+      </div>
+
+      <!-- Testing stops -->
+      <div class="form-section">
+        <h3>Test With Predefined Locations</h3>
+        <div class="controls">
+          <button id="test-bennett">Bennett University</button>
+          <button id="test-ablock-cafeteria">A Block to Cafeteria</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaflet Routing Machine JavaScript -->
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script>
+      // Initialize the map once the page loads
+      let map;
+      let markers = {};
+      let routeLine;
+
+      function createMarkerIcon(type) {
+        // Use clearly different colors for pickup and dropoff
+        const iconUrl =
+          type === "pickup"
+            ? "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png" // Green for pickup
+            : type === "dropoff"
+            ? "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png" // Red for dropoff
+            : "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png"; // Blue for stops
+
+        return L.icon({
+          iconUrl: iconUrl,
+          shadowUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41],
+        });
+      }
+
+      function initMap() {
+        // Create map if it doesn't exist
+        if (!map) {
+          map = L.map("map").setView([28.450151, 77.584286], 13);
+
+          // Add tile layer
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19,
+          }).addTo(map);
+
+          // Add click handler
+          map.on("click", handleMapClick);
+        }
+      }
+
+      function updateRouteDisplay(routeStops) {
+        // Ensure routeStops is an array
+        routeStops = Array.isArray(routeStops) ? routeStops : [];
+
+        // Clear existing route line
+        if (routeLine) {
+          routeLine.remove();
+          routeLine = null;
+        }
+
+        // Clear existing markers
+        Object.values(markers).forEach((marker) => marker.remove());
+        markers = {};
+
+        // Get valid coordinates
+        const validStops = routeStops.filter((stop) => stop && stop.coords);
+        const coordinates = validStops.map((stop) => [
+          stop.coords.lat,
+          stop.coords.lng,
+        ]);
+
+        // Add markers for each stop
+        validStops.forEach((stop, index) => {
+          const marker = L.marker([stop.coords.lat, stop.coords.lng], {
+            icon: createMarkerIcon(stop.type || "default"),
+          }).addTo(map);
+
+          marker.bindPopup(
+            `${stop.label || "Location"}<br>${stop.coords.lat.toFixed(
+              6
+            )}, ${stop.coords.lng.toFixed(6)}`
+          );
+          markers[index] = marker;
+        });
+
+        // Draw route line if we have at least 2 points
+        if (coordinates.length >= 2) {
+          routeLine = L.polyline(coordinates, {
+            color: "#3B82F6", // Blue
+            weight: 4,
+            opacity: 0.7,
+          }).addTo(map);
+
+          // Fit map to bounds of the route
+          map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+        } else if (coordinates.length === 1) {
+          // If only one point, center on it
+          map.setView(coordinates[0], 15);
+        }
+      }
+
+      function handleMapClick(e) {
+        const { lat, lng } = e.latlng;
+
+        // Get the current mode (pickup or dropoff)
+        const isSettingPickup =
+          document.querySelector('input[name="location-type"]:checked')
+            .value === "pickup";
+
+        // Create a new location object
+        const location = {
+          latitude: lat,
+          longitude: lng,
+          address: `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+          type: isSettingPickup ? "pickup" : "dropoff",
+        };
+
+        // Update the form fields
+        if (isSettingPickup) {
+          document.getElementById("pickup-address").value = location.address;
+          document.getElementById("pickup-lat").value = location.latitude;
+          document.getElementById("pickup-lng").value = location.longitude;
+        } else {
+          document.getElementById("dropoff-address").value = location.address;
+          document.getElementById("dropoff-lat").value = location.latitude;
+          document.getElementById("dropoff-lng").value = location.longitude;
+        }
+
+        // Update the route display
+        updateMapDisplay();
+      }
+
+      function updateMapDisplay() {
+        // Get pickup and dropoff coordinates from form
+        const pickup = {
+          type: "pickup",
+          label: document.getElementById("pickup-address").value || "Pickup",
+          coords: {
+            lat: parseFloat(document.getElementById("pickup-lat").value),
+            lng: parseFloat(document.getElementById("pickup-lng").value),
+          },
+        };
+
+        const dropoff = {
+          type: "dropoff",
+          label: document.getElementById("dropoff-address").value || "Dropoff",
+          coords: {
+            lat: parseFloat(document.getElementById("dropoff-lat").value),
+            lng: parseFloat(document.getElementById("dropoff-lng").value),
+          },
+        };
+
+        // Create routeStops array with valid locations
+        const routeStops = [];
+
+        // Add pickup if coordinates are valid
+        if (!isNaN(pickup.coords.lat) && !isNaN(pickup.coords.lng)) {
+          routeStops.push(pickup);
+        }
+
+        // Add dropoff if coordinates are valid
+        if (!isNaN(dropoff.coords.lat) && !isNaN(dropoff.coords.lng)) {
+          routeStops.push(dropoff);
+        }
+
+        // Update the route display
+        updateRouteDisplay(routeStops);
+      }
+
+      function clearAll() {
+        // Clear form fields
+        document.getElementById("pickup-address").value = "";
+        document.getElementById("pickup-lat").value = "";
+        document.getElementById("pickup-lng").value = "";
+        document.getElementById("dropoff-address").value = "";
+        document.getElementById("dropoff-lat").value = "";
+        document.getElementById("dropoff-lng").value = "";
+
+        // Clear map
+        updateRouteDisplay([]);
+      }
+
+      // Function to set a test route
+      function setTestRoute(pickup, dropoff) {
+        // Add type properties if not already set
+        const pickupWithType = { ...pickup, type: "pickup" };
+        const dropoffWithType = { ...dropoff, type: "dropoff" };
+
+        // Set form fields
+        document.getElementById("pickup-address").value =
+          pickupWithType.address;
+        document.getElementById("pickup-lat").value = pickupWithType.latitude;
+        document.getElementById("pickup-lng").value = pickupWithType.longitude;
+        document.getElementById("dropoff-address").value =
+          dropoffWithType.address;
+        document.getElementById("dropoff-lat").value = dropoffWithType.latitude;
+        document.getElementById("dropoff-lng").value =
+          dropoffWithType.longitude;
+
+        // Update map
+        updateMapDisplay();
+      }
+
+      // Initialize the map when the page loads
+      window.onload = function () {
+        initMap();
+
+        // Form event listeners
+        document
+          .getElementById("update-map")
+          .addEventListener("click", function (e) {
+            e.preventDefault();
+            updateMapDisplay();
+          });
+
+        document
+          .getElementById("clear-all")
+          .addEventListener("click", function (e) {
+            e.preventDefault();
+            clearAll();
+          });
+
+        // Test button handlers
+        document
+          .getElementById("test-bennett")
+          .addEventListener("click", function (e) {
+            e.preventDefault();
+            map.setView([28.450151, 77.584286], 15);
+          });
+
+        document
+          .getElementById("test-ablock-cafeteria")
+          .addEventListener("click", function (e) {
+            e.preventDefault();
+            setTestRoute(
+              { latitude: 28.450184, longitude: 77.584425, address: "A block" },
+              { latitude: 28.45049, longitude: 77.586394, address: "Cafeteria" }
+            );
+          });
+      };
+    </script>
+  </body>
+</html>

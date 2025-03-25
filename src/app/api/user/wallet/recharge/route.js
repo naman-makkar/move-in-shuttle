@@ -7,7 +7,7 @@ import Transaction from '@/models/transaction';
 export async function POST(request) {
   try {
     await dbConnect();
-    const { userId, amount } = await request.json(); // amount to add
+    const { userId, amount, description } = await request.json(); // amount to add
     const user = await User.findOne({ userId });
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -21,7 +21,7 @@ export async function POST(request) {
       userId: user.userId,
       amount: amount,
       type: 'credit',
-      description: 'Wallet recharge'
+      description: description || 'Wallet recharge'
     });
 
     return NextResponse.json({ success: true, walletBalance: user.walletBalance }, { status: 200 });

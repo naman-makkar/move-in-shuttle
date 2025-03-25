@@ -23,6 +23,16 @@ const BookingSchema = new mongoose.Schema(
     shuttleId: { type: String, required: true },
     fromStop: { type: String, required: true },
     toStop: { type: String, required: true },
+    pickupLocation: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+      address: { type: String }
+    },
+    dropoffLocation: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+      address: { type: String }
+    },
     fare: { type: Number, required: true },
     bookingStatus: {
       type: String,

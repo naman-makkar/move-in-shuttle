@@ -45,6 +45,11 @@ const ShuttleSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true,
+  },
+  shuttleType: {
+    type: String,
+    enum: ['general', 'women-only'],
+    default: 'general',
   }
 }, {
   timestamps: true,
