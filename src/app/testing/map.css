@@ -1,12 +1,178 @@
-/* Ensure the map container takes up the full space */
-#map,
-.map-container {
+/* Map styles */
+#map-container {
 	height: 100%;
 	width: 100%;
-	position: absolute;
-	top: 0;
-	left: 0;
+	position: relative;
 	z-index: 0;
+	border-radius: 12px;
+	overflow: hidden;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Modern Location card styles */
+.location-card {
+	background-color: white;
+	border-radius: 12px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+	overflow: hidden;
+	transition: all 0.3s ease;
+}
+
+.location-card:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Modern input styles */
+.modern-input {
+	width: 100%;
+	padding: 14px 16px;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	font-size: 16px;
+	transition: all 0.2s ease;
+	background-color: #f9fafb;
+}
+
+.modern-input:focus {
+	outline: none;
+	border-color: #3b82f6;
+	background-color: white;
+	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Modern button styles */
+.btn-primary {
+	background-color: #3b82f6;
+	color: white;
+	font-weight: 600;
+	padding: 12px 20px;
+	border-radius: 8px;
+	border: none;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	box-shadow: 0 2px 5px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:hover {
+	background-color: #2563eb;
+	transform: translateY(-1px);
+	box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+}
+
+.btn-secondary {
+	background-color: #f3f4f6;
+	color: #4b5563;
+	font-weight: 600;
+	padding: 12px 20px;
+	border-radius: 8px;
+	border: 1px solid #e5e7eb;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+	background-color: #e5e7eb;
+	color: #1f2937;
+}
+
+/* Location icon styles */
+.location-icon {
+	width: 40px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+}
+
+.location-icon.pickup {
+	background-color: rgba(16, 185, 129, 0.1);
+	color: #10b981;
+}
+
+.location-icon.dropoff {
+	background-color: rgba(239, 68, 68, 0.1);
+	color: #ef4444;
+}
+
+/* Animation classes */
+.fade-in {
+	animation: fadeIn 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Ride summary styles */
+.ride-summary {
+	background-color: white;
+	border-radius: 12px;
+	padding: 16px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.ride-summary-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding-bottom: 12px;
+	border-bottom: 1px solid #e5e7eb;
+	margin-bottom: 12px;
+}
+
+.ride-summary-row {
+	display: flex;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+
+/* Card container */
+.card-container {
+	background-color: white;
+	border-radius: 16px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+	padding: 24px;
+	margin-bottom: 20px;
+}
+
+/* Custom marker style overrides for Leaflet */
+.leaflet-div-icon {
+	background: transparent;
+	border: none;
+}
+
+/* Tooltip customization */
+.location-tooltip {
+	font-size: 14px;
+	padding: 8px 12px;
+	border-radius: 8px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	border: none;
+}
+
+/* Loading animation */
+.loading-spinner {
+	width: 40px;
+	height: 40px;
+	border: 3px solid rgba(59, 130, 246, 0.2);
+	border-top-color: #3b82f6;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 /* Fix for marker z-index issues */
@@ -34,4 +200,14 @@
 	height: 100%;
 	width: 100%;
 	background: #f8f8f8;
+}
+
+/* Hide routing control containers by default */
+.leaflet-routing-container {
+	display: none !important;
+}
+
+/* Make sure routing lines appear above tiles but below markers */
+.leaflet-overlay-pane {
+	z-index: 400 !important;
 }

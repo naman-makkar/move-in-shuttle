@@ -1,579 +1,596 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MapPin, Navigation, X, Search, ChevronRight, CornerDownRight, CircleDot, Clock, Loader2 } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
+import './map.css';
 
 // Dynamically import the map component with no SSR
 const MapWithNoSSR = dynamic(() => import('./MapComponent'), {
 	ssr: false,
 	loading: () => (
-		<div className='h-[500px] w-full bg-gray-100 flex items-center justify-center'>
-			Loading Map...
+		<div className='h-full w-full bg-gray-100 flex items-center justify-center rounded-lg'>
+			<div className="loading-spinner"></div>
+			<span className="ml-3 text-gray-600">Loading Map...</span>
 		</div>
 	)
 });
 
-// Extended NCR and nearby major cities boundaries
-const REGION_BOUNDS = {
-	// Format: [min_lon, min_lat, max_lon, max_lat]
-	// Extended boundaries to include Greater Noida, Gurgaon, Chandigarh region
-	viewbox: '76.2424,28.2089,77.9885,30.8894',
-	center: [28.4506465, 77.5841978],
-	regions: {
-		delhi_ncr: {
-			name: 'Delhi-NCR',
-			bounds: '76.8424,28.4089,77.5885,28.8894'
-		},
-		greater_noida: {
-			name: 'Greater Noida',
-			bounds: '77.3500,28.4500,77.6200,28.6200'
-		},
-		gurgaon: {
-			name: 'Gurgaon',
-			bounds: '76.9200,28.3800,77.1500,28.5500'
-		},
-		chandigarh: {
-			name: 'Chandigarh Region',
-			bounds: '76.7000,30.6500,76.8500,30.8000'
-		}
-	}
-};
-
-// Enhanced search types for better local results
-const SEARCH_TYPES = [
-	'residential',
-	'apartments',
-	'suburb',
-	'neighbourhood',
-	'housing',
-	'building',
-	'place',
-	'city',
-	'town',
-	'village',
-	'commercial',
-	'industrial'
+// Predefined stops for the Bennett University area
+const predefinedStops = [
+	{ name: "A block", latitude: 28.450184, longitude: 77.584425, address: "A block" },
+	{ name: "B block", latitude: 28.450151, longitude: 77.584286, address: "B block" },
+	{ name: "Sports Complex", latitude: 28.45018041097755, longitude: 77.5871834486546, address: "Sports Complex" },
+	{ name: "N block", latitude: 28.448933, longitude: 77.583559, address: "N block" },
+	{ name: "P block", latitude: 28.449785, longitude: 77.582806, address: "P block" },
+	{ name: "Cafeteria", latitude: 28.450490, longitude: 77.586394, address: "Cafeteria" }
 ];
 
-// Common localities and areas for better search
-const COMMON_AREAS = [
-	'Sector',
-	'Block',
-	'Phase',
-	'Extension',
-	'Enclave',
-	'Colony',
-	'Society',
-	'Apartment',
-	'Complex',
-	'Township',
-	'Garden',
-	'Vihar',
-	'Nagar',
-	'Puram'
-];
-
-// Add default styling for Leaflet
-const leafletStyles = `
-	.leaflet-container {
-		height: 100%;
-		width: 100%;
-	}
-`;
-
-export default function TestingPage() {
-	const [searchQuery, setSearchQuery] = useState('');
-	const [suggestions, setSuggestions] = useState([]);
-	const [position, setPosition] = useState(REGION_BOUNDS.center);
-	const [map, setMap] = useState(null);
-	const [isLoading, setIsLoading] = useState(false);
-	const [selectedRegion, setSelectedRegion] = useState('all');
-	const searchTimeout = useRef(null);
-	const [routeStops, setRouteStops] = useState([
-		{ type: 'pickup', label: 'Pickup Location', coords: null },
-		{ type: 'dropoff', label: 'Final Destination', coords: null }
-	]);
-	const [activeStopIndex, setActiveStopIndex] = useState(0);
-	const [routeData, setRouteData] = useState(null);
-
-	// Handle location selection from map click
-	const handleLocationSelect = (coordinates) => {
-		const [lat, lng] = coordinates;
-		console.log('Selected coordinates:', { lat, lng });
-
-		// Update the active stop with the selected coordinates
-		setRouteStops((stops) =>
-			stops.map((stop, index) =>
-				index === activeStopIndex ? { ...stop, coords: { lat, lng } } : stop
-			)
-		);
-	};
-
-	// Function to remove a stop
-	const removeStop = (index) => {
-		if (index === 0 || index === routeStops.length - 1) return; // Don't remove pickup or final destination
-		setRouteStops((stops) => stops.filter((_, i) => i !== index));
-	};
-
-	// Function to get stop status
-	const getStopStatus = (stop) => {
-		if (!stop.coords) return 'Not set';
-		return (
-			stop.address ||
-			`${stop.coords.lat.toFixed(6)}, ${stop.coords.lng.toFixed(6)}`
-		);
-	};
-
-	// Enhanced search function with better local context
-	const enhanceSearchQuery = (query) => {
-		// Check if query already contains common area terms
-		const hasCommonTerm = COMMON_AREAS.some((term) =>
-			query.toLowerCase().includes(term.toLowerCase())
-		);
-
-		// If no common term is found and query doesn't contain numbers (to avoid modifying sector numbers etc.)
-		if (!hasCommonTerm && !/\d/.test(query)) {
-			// Try to match with common areas
-			const enhancedQueries = COMMON_AREAS.map((term) => `${query} ${term}`);
-			return [query, ...enhancedQueries];
+// Main page component
+export default function BookingPage() {
+	// State for form data
+	const [formData, setFormData] = useState({
+		pickup: null,
+		dropoff: null,
+		stops: []
+	});
+	
+	// UI state
+	const [fare, setFare] = useState(0);
+	const [balance, setBalance] = useState(() => {
+		if (typeof window !== 'undefined') {
+			const savedBalance = localStorage.getItem('walletBalance');
+			return savedBalance ? parseFloat(savedBalance) : 250.00;
 		}
-
-		return [query];
-	};
-
-	// Fetch suggestions when search query changes
+		return 250.00;
+	});
+	
+	// Store the pickup/dropoff mode in a ref to ensure it's always up-to-date
+	const [isSettingPickup, setIsSettingPickup] = useState(true);
+	const isSettingPickupRef = useRef(true);
+	
+	// Update the ref whenever the state changes
 	useEffect(() => {
-		const fetchSuggestions = async () => {
-			if (!searchQuery.trim() || searchQuery.length < 2) {
-				setSuggestions([]);
-				return;
+		isSettingPickupRef.current = isSettingPickup;
+	}, [isSettingPickup]);
+	
+	const [searchQuery, setSearchQuery] = useState('');
+	const [searchResults, setSearchResults] = useState([]);
+	const [isLoading, setIsLoading] = useState(false);
+	const [showConfirmation, setShowConfirmation] = useState(false);
+	
+	// Map references
+	const mapRef = useRef(null);
+
+	// Calculate fare when pickup and dropoff change
+	useEffect(() => {
+		if (formData.pickup && formData.dropoff) {
+			const R = 6371; // Radius of Earth in km
+			let totalDistance = 0;
+
+			// Haversine formula to calculate distance between two points
+			const calculateDistance = (from, to) => {
+				const lat1 = from.latitude * Math.PI / 180;
+				const lat2 = to.latitude * Math.PI / 180;
+				const dLat = (to.latitude - from.latitude) * Math.PI / 180;
+				const dLon = (to.longitude - from.longitude) * Math.PI / 180;
+				
+				const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+						  Math.cos(lat1) * Math.cos(lat2) *
+						  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+				
+				const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+				return R * c;
+			};
+
+			// Create array of all points in the route (pickup, stops, dropoff)
+			const points = [
+				formData.pickup,
+				...(formData.stops || []),
+				formData.dropoff
+			].filter(Boolean);
+
+			// Calculate total distance by summing distances between consecutive points
+			for (let i = 0; i < points.length - 1; i++) {
+				totalDistance += calculateDistance(points[i], points[i + 1]);
 			}
 
-			setIsLoading(true);
-			try {
-				const enhancedQueries = enhanceSearchQuery(searchQuery);
-				let allResults = [];
-
-				// Get the appropriate viewbox based on selected region
-				const viewbox =
-					selectedRegion === 'all'
-						? REGION_BOUNDS.viewbox
-						: REGION_BOUNDS.regions[selectedRegion]?.bounds ||
-						  REGION_BOUNDS.viewbox;
-
-				// Fetch results for each enhanced query
-				for (const query of enhancedQueries) {
-					const searchParams = new URLSearchParams({
-						format: 'json',
-						q: query,
-						viewbox: viewbox,
-						bounded: 1,
-						limit: 5,
-						countrycodes: 'in',
-						addressdetails: 1,
-						featuretype: SEARCH_TYPES.join(',')
-					});
-
-					const response = await fetch(
-						`https://nominatim.openstreetmap.org/search?${searchParams.toString()}`
-					);
-					const data = await response.json();
-					allResults = [...allResults, ...data];
-				}
-
-				// Remove duplicates and format results
-				const uniqueResults = Array.from(
-					new Set(allResults.map((r) => r.place_id))
-				).map((id) => allResults.find((r) => r.place_id === id));
-
-				// Process and format the suggestions
-				const formattedSuggestions = uniqueResults.map((item) => {
-					let displayName = item.display_name;
-					let detailsText = '';
-
-					if (item.address) {
-						const parts = [];
-						const details = [];
-
-						// Primary location name
-						if (item.address.residential) parts.push(item.address.residential);
-						if (item.address.suburb) parts.push(item.address.suburb);
-						if (item.address.neighbourhood)
-							parts.push(item.address.neighbourhood);
-
-						// Location details
-						if (item.address.suburb) details.push(item.address.suburb);
-						if (item.address.city || item.address.town) {
-							details.push(item.address.city || item.address.town);
-						}
-						if (item.address.state) details.push(item.address.state);
-
-						// Format display name and details
-						if (parts.length > 0) {
-							displayName = parts.join(', ');
-						}
-						detailsText = details.join(', ');
-					}
-
-					return {
-						...item,
-						display_name: displayName,
-						details: detailsText
-					};
-				});
-
-				setSuggestions(formattedSuggestions.slice(0, 7));
-			} catch (error) {
-				console.error('Error fetching suggestions:', error);
-			} finally {
-				setIsLoading(false);
-			}
-		};
-
-		if (searchTimeout.current) {
-			clearTimeout(searchTimeout.current);
+			// Calculate fare based on distance (fixed rate of ₹15 per km)
+			const calculatedFare = totalDistance * 15;
+			setFare(Math.round(calculatedFare));
 		}
+	}, [formData.pickup, formData.dropoff, formData.stops]);
 
-		searchTimeout.current = setTimeout(fetchSuggestions, 300);
-
-		return () => {
-			if (searchTimeout.current) {
-				clearTimeout(searchTimeout.current);
-			}
-		};
-	}, [searchQuery, selectedRegion]);
-
-	const handleSuggestionClick = (suggestion) => {
-		const newPosition = [
-			parseFloat(suggestion.lat),
-			parseFloat(suggestion.lon)
-		];
-		setPosition(newPosition);
-		setSearchQuery(suggestion.display_name);
-		setSuggestions([]);
-
-		// Update the active stop with the selected coordinates
-		setRouteStops((stops) =>
-			stops.map((stop, index) =>
-				index === activeStopIndex
-					? {
-							...stop,
-							coords: {
-								lat: parseFloat(suggestion.lat),
-								lng: parseFloat(suggestion.lon)
-							},
-							address: suggestion.display_name
-					  }
-					: stop
-			)
-		);
-
-		if (map) {
-			map.flyTo(newPosition, 16, {
-				duration: 1.5
-			});
-		}
-	};
-
-	const handleSearch = async (e) => {
-		e.preventDefault();
-		if (!searchQuery.trim()) return;
-
-		setIsLoading(true);
+	// Handle map click to set pickup or dropoff location
+	const handleMapClick = async (coordinates) => {
+		const [lat, lng] = coordinates;
+		
+		// Use the ref value instead of the state directly to ensure it's current
+		const currentIsSettingPickup = isSettingPickupRef.current;
+		
 		try {
-			const searchParams = new URLSearchParams({
-				format: 'json',
-				q: searchQuery,
-				viewbox:
-					selectedRegion === 'all'
-						? REGION_BOUNDS.viewbox
-						: REGION_BOUNDS.regions[selectedRegion]?.bounds ||
-						  REGION_BOUNDS.viewbox,
-				bounded: 1,
-				limit: 1,
-				countrycodes: 'in',
-				addressdetails: 1
-			});
-
+			// Reverse geocoding to get address from coordinates
 			const response = await fetch(
-				`https://nominatim.openstreetmap.org/search?${searchParams.toString()}`
+				`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
 			);
 			const data = await response.json();
+			
+			const location = {
+				latitude: lat,
+				longitude: lng,
+				address: data.display_name,
+				type: currentIsSettingPickup ? 'pickup' : 'dropoff'
+			};
 
-			if (data.length > 0) {
-				const { lat, lon, display_name } = data[0];
-				const newPosition = [parseFloat(lat), parseFloat(lon)];
-				setPosition(newPosition);
-				setSuggestions([]);
+			// Update pickup or dropoff based on current mode
+			setFormData(prev => ({
+				...prev,
+				[currentIsSettingPickup ? 'pickup' : 'dropoff']: location
+			}));
 
-				// Update the active stop with the selected coordinates
-				setRouteStops((stops) =>
-					stops.map((stop, index) =>
-						index === activeStopIndex
-							? {
-									...stop,
-									coords: { lat: parseFloat(lat), lng: parseFloat(lon) },
-									address: display_name
-							  }
-							: stop
-					)
-				);
-
-				if (map) {
-					map.flyTo(newPosition, 16, {
-						duration: 1.5
-					});
-				}
-			} else {
-				alert('Location not found. Please try a different search term.');
+			// Center the map on the selected location
+			if (mapRef.current) {
+				mapRef.current.flyTo([lat, lng], 15);
 			}
 		} catch (error) {
-			console.error('Error searching location:', error);
-			alert('Error searching for location. Please try again.');
+			console.error('Error getting address:', error);
+			// Add fallback in case geocoding fails
+			const location = {
+				latitude: lat,
+				longitude: lng,
+				address: `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+				type: currentIsSettingPickup ? 'pickup' : 'dropoff'
+			};
+			
+			setFormData(prev => ({
+				...prev,
+				[currentIsSettingPickup ? 'pickup' : 'dropoff']: location
+			}));
+		}
+	};
+
+	// Handle search for locations
+	const handleSearch = async () => {
+		if (!searchQuery.trim()) return;
+		
+		setIsLoading(true);
+		try {
+			const params = new URLSearchParams({
+				format: 'json',
+				q: searchQuery,
+				limit: 5
+			});
+			
+			const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`);
+			const data = await response.json();
+			
+			const results = data.map(item => ({
+				latitude: parseFloat(item.lat),
+				longitude: parseFloat(item.lon),
+				address: item.display_name
+			}));
+			
+			setSearchResults(results);
+		} catch (error) {
+			console.error('Error searching for locations:', error);
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	// Function to add a new stop
-	const addStop = () => {
-		if (routeStops.length >= 5) return; // Maximum 3 stops between pickup and dropoff
-		const newStop = {
-			type: 'stop',
-			label: `Stop ${routeStops.length - 1}`,
-			coords: null
+	// Handle selection of search result
+	const handleSelectSearchResult = (result) => {
+		// Use the ref value for consistency
+		const currentIsSettingPickup = isSettingPickupRef.current;
+		
+		const resultWithType = {
+			...result,
+			type: currentIsSettingPickup ? 'pickup' : 'dropoff'
 		};
-		setRouteStops((stops) => [
-			...stops.slice(0, -1), // All except last
-			newStop,
-			...stops.slice(-1) // Last item (dropoff)
-		]);
-	};
-
-	// Function to calculate route when stops change
-	const calculateRoute = async (stops) => {
-		const validStops = stops.filter((stop) => stop.coords);
-		if (validStops.length < 2) return null; // Need at least pickup and dropoff
-
-		try {
-			// Prepare coordinates string for OSRM
-			const coordinates = validStops
-				.map((stop) => `${stop.coords.lng},${stop.coords.lat}`)
-				.join(';');
-
-			const response = await fetch(
-				`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson`
-			);
-			const data = await response.json();
-
-			if (data.code === 'Ok' && data.routes && data.routes[0]) {
-				const route = data.routes[0];
-				setRouteData({
-					geometry: route.geometry,
-					distance: route.distance,
-					duration: route.duration
-				});
-				return route;
-			}
-		} catch (error) {
-			console.error('Error calculating route:', error);
+		
+		setFormData(prev => ({
+			...prev,
+			[currentIsSettingPickup ? 'pickup' : 'dropoff']: resultWithType
+		}));
+		
+		setSearchResults([]);
+		setSearchQuery('');
+		
+		// Center the map on the selected location
+		if (mapRef.current) {
+			mapRef.current.flyTo([result.latitude, result.longitude], 15);
 		}
-		return null;
 	};
 
-	// Update route when stops change
-	useEffect(() => {
-		const validStops = routeStops.filter((stop) => stop.coords);
-		if (validStops.length >= 2) {
-			calculateRoute(validStops);
-		} else {
-			setRouteData(null);
+	// Handle booking confirmation
+	const handleBookRide = () => {
+		// Check if user has enough balance
+		if (balance < fare) {
+			alert('Insufficient balance. Please add funds to your wallet.');
+			return;
 		}
-	}, [routeStops]);
-
-	// Function to format duration
-	const formatDuration = (seconds) => {
-		const hours = Math.floor(seconds / 3600);
-		const minutes = Math.floor((seconds % 3600) / 60);
-		return hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`;
+		
+		// Set confirmation state to show confirmation screen
+		setShowConfirmation(true);
+		
+		// In a real app, you would send the booking details to your backend here
 	};
 
-	// Function to format distance
-	const formatDistance = (meters) => {
-		const km = (meters / 1000).toFixed(1);
-		return `${km} km`;
+	const confirmRide = () => {
+		// Update user's balance
+		const newBalance = balance - fare;
+		setBalance(newBalance);
+		
+		// Save to localStorage
+		if (typeof window !== 'undefined') {
+			localStorage.setItem('walletBalance', newBalance.toString());
+		}
+		
+		// Show success message
+		alert('Ride booked successfully! Your driver is on the way.');
+		
+		// Reset form
+		setFormData({
+			pickup: null,
+			dropoff: null,
+			stops: []
+		});
+		
+		// Close confirmation
+		setShowConfirmation(false);
 	};
+
+	// Clear pickup or dropoff location
+	const clearLocation = (type) => {
+		setFormData(prev => ({
+			...prev,
+			[type]: null
+		}));
+	};
+
+	// Check if booking is possible
+	const canBook = formData.pickup && formData.dropoff;
 
 	return (
-		<div className='p-4 flex'>
-			{/* Route Selection Panel */}
-			<div className='w-1/3 mr-4 bg-white rounded-lg shadow-lg p-4 z-10 h-[calc(500px+2rem)] overflow-auto'>
-				<h2 className='text-xl font-bold mb-4'>Route Planner</h2>
-				<div className='space-y-4'>
-					{routeStops.map((stop, index) => (
-						<div
-							key={index}
-							className={`p-4 rounded-lg border-2 cursor-pointer transition-all
-								${activeStopIndex === index ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}
-								${
-									stop.type === 'pickup'
-										? 'bg-green-50'
-										: stop.type === 'dropoff'
-										? 'bg-red-50'
-										: 'bg-white'
-								}`}
-							onClick={() => {
-								setActiveStopIndex(index);
-								setSearchQuery('');
-								setSuggestions([]);
-							}}>
-							<div className='flex justify-between items-center'>
-								<div className='flex items-center'>
-									{stop.type === 'pickup' && <span className='mr-2'>🚗</span>}
-									{stop.type === 'stop' && <span className='mr-2'>🔵</span>}
-									{stop.type === 'dropoff' && <span className='mr-2'>📍</span>}
-									<span className='font-medium'>{stop.label}</span>
-								</div>
-								{stop.type === 'stop' && (
-									<button
-										onClick={(e) => {
-											e.stopPropagation();
-											removeStop(index);
-										}}
-										className='text-red-500 hover:text-red-700'>
-										✕
-									</button>
-								)}
-							</div>
-							<div className='mt-2 text-sm text-gray-500 break-words'>
-								{getStopStatus(stop)}
-							</div>
-						</div>
-					))}
-
-					{routeStops.length < 5 && (
-						<button
-							onClick={addStop}
-							className='w-full p-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors'>
-							+ Add Stop
-						</button>
-					)}
-				</div>
-
-				{routeData && (
-					<div className='mt-4 p-4 bg-gray-50 rounded-lg'>
-						<h3 className='font-medium mb-2'>Route Summary</h3>
-						<div className='space-y-2'>
-							<div className='text-sm text-gray-600'>
-								<span className='font-medium'>Distance:</span>{' '}
-								{formatDistance(routeData.distance)}
-							</div>
-							<div className='text-sm text-gray-600'>
-								<span className='font-medium'>Duration:</span>{' '}
-								{formatDuration(routeData.duration)}
-							</div>
-							<div className='text-sm text-gray-600'>
-								{routeStops.filter((stop) => stop.coords).length} locations
-								selected
-							</div>
+		<div className="min-h-screen bg-gray-50">
+			<div className="max-w-6xl mx-auto px-4 py-8">
+				<div className="flex flex-col lg:flex-row gap-6">
+					{/* Left column - Map */}
+					<div className="w-full lg:w-7/12 h-[70vh] lg:h-[80vh]">
+						<div className="w-full h-full rounded-xl overflow-hidden shadow-lg">
+							<MapWithNoSSR
+								position={[28.4501, 77.5848]} // Center of Bennett University
+								pickup={formData.pickup}
+								dropoff={formData.dropoff}
+								stops={formData.stops || []}
+								setMap={(map) => {
+									mapRef.current = map;
+								}}
+								onLocationSelect={handleMapClick}
+								routeStops={[
+									...(formData.pickup ? [
+										{
+											type: 'pickup',
+											label: formData.pickup?.address || 'Pickup',
+											coords: {
+												lat: formData.pickup?.latitude,
+												lng: formData.pickup?.longitude
+											}
+										}
+									] : []),
+									...(formData.stops || []).map(stop => ({
+										type: 'stop',
+										label: stop.address || 'Stop',
+										coords: {
+											lat: stop.latitude,
+											lng: stop.longitude
+										}
+									})),
+									...(formData.dropoff ? [
+										{
+											type: 'dropoff',
+											label: formData.dropoff?.address || 'Dropoff',
+											coords: {
+												lat: formData.dropoff?.latitude,
+												lng: formData.dropoff?.longitude
+											}
+										}
+									] : [])
+								]}
+								key={`map-${formData.pickup?.latitude}-${formData.pickup?.longitude}-${formData.dropoff?.latitude}-${formData.dropoff?.longitude}`}
+							/>
 						</div>
 					</div>
-				)}
-			</div>
 
-			{/* Main Content */}
-			<div className='flex-1'>
-				<div className='mb-4 relative'>
-					<form
-						onSubmit={handleSearch}
-						className='flex flex-col gap-2'>
-						{/* Region selector */}
-						<div className='flex gap-2 mb-2'>
-							<select
-								value={selectedRegion}
-								onChange={(e) => setSelectedRegion(e.target.value)}
-								className='p-2 border border-gray-300 rounded'>
-								<option value='all'>All Regions</option>
-								{Object.entries(REGION_BOUNDS.regions).map(([key, region]) => (
-									<option
-										key={key}
-										value={key}>
-										{region.name}
-									</option>
-								))}
-							</select>
-						</div>
-
-						<div className='flex gap-2'>
-							<div className='relative flex-1'>
-								<input
-									type='text'
-									value={searchQuery}
-									onChange={(e) => setSearchQuery(e.target.value)}
-									placeholder='Search for locations (e.g., sectors, societies, landmarks...)'
-									className='w-full p-2 border border-gray-300 rounded'
-								/>
-
-								{/* Loading indicator */}
-								{isLoading && (
-									<div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
-										<div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500'></div>
-									</div>
-								)}
-
-								{/* Suggestions dropdown */}
-								{suggestions.length > 0 && (
-									<div className='absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto'>
-										{suggestions.map((suggestion, index) => (
-											<button
+					{/* Right column - Booking form */}
+					<div className="w-full lg:w-5/12">
+						<div className="card-container">
+							<h1 className="text-2xl font-bold mb-6">Book Your Ride</h1>
+							
+							{/* Toggle buttons */}
+							<div className="mb-6">
+								<div className="flex bg-gray-100 p-1 rounded-lg">
+									<button
+										className={`flex-1 py-3 px-4 rounded-lg transition-all duration-300 ${
+											isSettingPickup
+												? 'bg-white text-black shadow-md'
+												: 'bg-transparent text-gray-500 hover:bg-gray-200'
+										}`}
+										onClick={() => {
+											setIsSettingPickup(true);
+											isSettingPickupRef.current = true;
+										}}
+									>
+										<div className="flex items-center justify-center">
+											<div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
+											Set Pickup
+										</div>
+									</button>
+									<button
+										className={`flex-1 py-3 px-4 rounded-lg transition-all duration-300 ${
+											!isSettingPickup
+												? 'bg-white text-black shadow-md'
+												: 'bg-transparent text-gray-500 hover:bg-gray-200'
+										}`}
+										onClick={() => {
+											setIsSettingPickup(false);
+											isSettingPickupRef.current = false;
+										}}
+									>
+										<div className="flex items-center justify-center">
+											<div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
+											Set Dropoff
+										</div>
+									</button>
+								</div>
+							</div>
+							
+							{/* Search bar */}
+							<div className="relative mb-6">
+								<div className="flex items-center border border-gray-300 rounded-lg bg-white overflow-hidden">
+									<input
+										type="text"
+										className="flex-grow px-4 py-3 outline-none"
+										placeholder={isSettingPickup ? "Search for pickup location" : "Search for dropoff location"}
+										value={searchQuery}
+										onChange={(e) => setSearchQuery(e.target.value)}
+										onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+									/>
+									<button 
+										className="px-4 py-3 bg-gray-100 hover:bg-gray-200 transition-colors"
+										onClick={handleSearch}
+									>
+										{isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+									</button>
+								</div>
+								
+								{/* Search results */}
+								{searchResults.length > 0 && (
+									<div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+										{searchResults.map((result, index) => (
+											<div
 												key={index}
-												type='button'
-												onClick={() => handleSuggestionClick(suggestion)}
-												className='w-full text-left px-4 py-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none'>
-												<div className='font-medium truncate'>
-													{suggestion.display_name}
+												className="p-3 hover:bg-gray-50 cursor-pointer flex items-start border-b last:border-b-0"
+												onClick={() => handleSelectSearchResult(result)}
+											>
+												<div className="flex-shrink-0 mr-3">
+													<MapPin className="w-5 h-5 text-gray-500" />
 												</div>
-												{suggestion.details && (
-													<div className='text-sm text-gray-500 truncate'>
-														{suggestion.details}
+												<div className="overflow-hidden">
+													<div className="text-sm text-gray-900 truncate">{result.address}</div>
+													<div className="text-xs text-gray-500">
+														{result.latitude.toFixed(6)}, {result.longitude.toFixed(6)}
 													</div>
-												)}
-											</button>
+												</div>
+											</div>
 										))}
 									</div>
 								)}
 							</div>
-
+							
+							{/* Location cards */}
+							<div className="space-y-4">
+								{/* Pickup location */}
+								<div className={`border rounded-lg p-4 relative ${formData.pickup ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50'}`}>
+									<div className="flex items-start">
+										<div className="location-icon pickup mr-3 flex-shrink-0">
+											<CircleDot className="w-5 h-5" />
+										</div>
+										<div className="flex-grow">
+											<div className="text-sm font-medium text-gray-900 mb-1">Pickup Location</div>
+											{formData.pickup ? (
+												<div className="text-sm text-gray-700 pr-7">{formData.pickup.address}</div>
+											) : (
+												<div className="text-sm text-gray-500 italic">Click on map or search to set pickup</div>
+											)}
+										</div>
+										{formData.pickup && (
+											<button 
+												className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+												onClick={() => clearLocation('pickup')}
+											>
+												<X className="w-5 h-5" />
+											</button>
+										)}
+									</div>
+								</div>
+								
+								{/* Connection line */}
+								<div className="flex justify-center">
+									<div className="h-6 border-l-2 border-dashed border-gray-300"></div>
+								</div>
+								
+								{/* Dropoff location */}
+								<div className={`border rounded-lg p-4 relative ${formData.dropoff ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-gray-50'}`}>
+									<div className="flex items-start">
+										<div className="location-icon dropoff mr-3 flex-shrink-0">
+											<Navigation className="w-5 h-5" />
+										</div>
+										<div className="flex-grow">
+											<div className="text-sm font-medium text-gray-900 mb-1">Dropoff Location</div>
+											{formData.dropoff ? (
+												<div className="text-sm text-gray-700 pr-7">{formData.dropoff.address}</div>
+											) : (
+												<div className="text-sm text-gray-500 italic">Click on map or search to set dropoff</div>
+											)}
+										</div>
+										{formData.dropoff && (
+											<button 
+												className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+												onClick={() => clearLocation('dropoff')}
+											>
+												<X className="w-5 h-5" />
+											</button>
+										)}
+									</div>
+								</div>
+							</div>
+							
+							{/* Common destinations */}
+							{(!formData.pickup || !formData.dropoff) && (
+								<div className="mt-6">
+									<h3 className="text-sm font-medium text-gray-700 mb-3">Bennett University Locations</h3>
+									<div className="grid grid-cols-2 gap-3">
+										{predefinedStops.slice(0, 4).map((stop, index) => (
+											<div
+												key={index}
+												className="border border-gray-200 rounded-lg p-3 cursor-pointer hover:bg-gray-50"
+												onClick={() => {
+													// Set location based on current mode
+													const location = {
+														...stop,
+														type: isSettingPickupRef.current ? 'pickup' : 'dropoff'
+													};
+													
+													setFormData(prev => ({
+														...prev,
+														[isSettingPickupRef.current ? 'pickup' : 'dropoff']: location
+													}));
+												}}
+											>
+												<div className="text-sm font-medium text-gray-900">{stop.name}</div>
+												<div className="text-xs text-gray-500 truncate">{stop.address}</div>
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+							
+							{/* Ride summary */}
+							{formData.pickup && formData.dropoff && (
+								<div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+									<h3 className="text-sm font-medium text-gray-700 mb-3">Ride Summary</h3>
+									
+									<div className="space-y-2">
+										<div className="flex justify-between text-sm">
+											<span className="text-gray-600">Distance</span>
+											<span className="font-semibold">{(fare/15).toFixed(1)} km</span>
+										</div>
+										<div className="flex justify-between text-sm">
+											<span className="text-gray-600">Estimated time</span>
+											<span className="font-semibold">{Math.max(5, Math.round((fare/15) * 3))} mins</span>
+										</div>
+										<div className="flex justify-between text-sm">
+											<span className="text-gray-600">Fare</span>
+											<span className="font-semibold">₹{fare.toFixed(2)}</span>
+										</div>
+										<div className="flex justify-between text-sm">
+											<span className="text-gray-600">Wallet balance</span>
+											<span className={`font-semibold ${balance < fare ? 'text-red-500' : 'text-green-500'}`}>
+												₹{balance.toFixed(2)}
+											</span>
+										</div>
+									</div>
+								</div>
+							)}
+							
+							{/* Book button */}
 							<button
-								type='submit'
-								disabled={isLoading}
-								className='px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed'>
-								Search
+								className={`w-full mt-6 py-4 rounded-lg font-medium transition-all ${
+									canBook 
+										? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md hover:shadow-lg' 
+										: 'bg-gray-200 text-gray-500 cursor-not-allowed'
+								}`}
+								disabled={!canBook}
+								onClick={handleBookRide}
+							>
+								{canBook ? 'Book Ride' : 'Set pickup & dropoff to book'}
 							</button>
+							
+							{balance < fare && canBook && (
+								<div className="mt-2 text-center text-red-500 text-sm">
+									Insufficient balance. Please add funds to your wallet.
+								</div>
+							)}
 						</div>
-					</form>
-				</div>
-
-				{/* Map container */}
-				<div
-					style={{
-						height: '500px',
-						width: '100%',
-						position: 'relative',
-						border: '1px solid #ccc',
-						borderRadius: '4px',
-						overflow: 'hidden'
-					}}>
-					<MapWithNoSSR
-						position={position}
-						setMap={setMap}
-						onLocationSelect={handleLocationSelect}
-						routeStops={routeStops}
-						routeData={routeData}
-					/>
+					</div>
 				</div>
 			</div>
+			
+			{/* Booking confirmation modal */}
+			{showConfirmation && (
+				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+					<div className="bg-white rounded-xl max-w-md w-full overflow-hidden">
+						<div className="p-6">
+							<h2 className="text-xl font-bold mb-4">Confirm Your Ride</h2>
+							
+							<div className="space-y-4 mb-6">
+								<div className="flex items-start">
+									<div className="location-icon pickup mr-3 flex-shrink-0">
+										<CircleDot className="w-5 h-5" />
+									</div>
+									<div>
+										<div className="text-sm font-medium text-gray-900">From</div>
+										<div className="text-sm text-gray-700">{formData.pickup?.address}</div>
+									</div>
+								</div>
+								
+								<div className="flex items-start">
+									<div className="location-icon dropoff mr-3 flex-shrink-0">
+										<Navigation className="w-5 h-5" />
+									</div>
+									<div>
+										<div className="text-sm font-medium text-gray-900">To</div>
+										<div className="text-sm text-gray-700">{formData.dropoff?.address}</div>
+									</div>
+								</div>
+								
+								<div className="border-t border-gray-200 pt-4">
+									<div className="flex justify-between text-sm mb-2">
+										<span className="text-gray-600">Distance</span>
+										<span className="font-semibold">{(fare/15).toFixed(1)} km</span>
+									</div>
+									<div className="flex justify-between text-sm mb-2">
+										<span className="text-gray-600">Estimated time</span>
+										<span className="font-semibold">{Math.max(5, Math.round((fare/15) * 3))} mins</span>
+									</div>
+									<div className="flex justify-between text-sm">
+										<span className="text-gray-600">Total fare</span>
+										<span className="font-semibold text-lg">₹{fare.toFixed(2)}</span>
+									</div>
+								</div>
+							</div>
+							
+							<div className="flex space-x-3">
+								<button
+									className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200"
+									onClick={() => setShowConfirmation(false)}
+								>
+									Cancel
+								</button>
+								<button
+									className="flex-1 py-3 px-4 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600"
+									onClick={confirmRide}
+								>
+									Confirm Ride
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

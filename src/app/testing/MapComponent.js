@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import L from 'leaflet';
 import './map.css';
 
-const MapComponent = ({ position, setMap, onLocationSelect, routeStops }) => {
+const MapComponent = ({ position, setMap, onLocationSelect, routeStops = [] }) => {
 	const [isClient, setIsClient] = useState(false);
 	const mapRef = useRef(null);
 	const markersRef = useRef({});
@@ -50,8 +50,11 @@ const MapComponent = ({ position, setMap, onLocationSelect, routeStops }) => {
 			polylineRef.current = null;
 		}
 
-		// Get all valid coordinates
-		const validStops = routeStops.filter((stop) => stop.coords);
+		// Ensure routeStops is an array before filtering
+		const validStops = Array.isArray(routeStops) 
+			? routeStops.filter((stop) => stop && stop.coords)
+			: [];
+			
 		const coordinates = validStops.map((stop) => [
 			stop.coords.lat,
 			stop.coords.lng
@@ -68,27 +71,29 @@ const MapComponent = ({ position, setMap, onLocationSelect, routeStops }) => {
 		}
 
 		// Update markers
-		routeStops.forEach((stop, index) => {
-			// Remove existing marker
-			if (markersRef.current[index]) {
-				markersRef.current[index].remove();
-				delete markersRef.current[index];
-			}
+		if (Array.isArray(routeStops)) {
+			routeStops.forEach((stop, index) => {
+				// Remove existing marker
+				if (markersRef.current[index]) {
+					markersRef.current[index].remove();
+					delete markersRef.current[index];
+				}
 
-			// Add new marker if coordinates exist
-			if (stop.coords) {
-				const marker = L.marker([stop.coords.lat, stop.coords.lng], {
-					icon: createMarkerIcon(stop.type)
-				}).addTo(mapRef.current);
+				// Add new marker if coordinates exist
+				if (stop && stop.coords) {
+					const marker = L.marker([stop.coords.lat, stop.coords.lng], {
+						icon: createMarkerIcon(stop.type)
+					}).addTo(mapRef.current);
 
-				marker.bindPopup(
-					`${stop.label}<br>${stop.coords.lat.toFixed(
-						6
-					)}, ${stop.coords.lng.toFixed(6)}`
-				);
-				markersRef.current[index] = marker;
-			}
-		});
+					marker.bindPopup(
+						`${stop.label}<br>${stop.coords.lat.toFixed(
+							6
+						)}, ${stop.coords.lng.toFixed(6)}`
+					);
+					markersRef.current[index] = marker;
+				}
+			});
+		}
 	};
 
 	// Initialize the map
