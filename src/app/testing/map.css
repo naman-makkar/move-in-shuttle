@@ -1,0 +1,37 @@
+/* Ensure the map container takes up the full space */
+#map,
+.map-container {
+	height: 100%;
+	width: 100%;
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 0;
+}
+
+/* Fix for marker z-index issues */
+.leaflet-marker-pane {
+	z-index: 600 !important;
+}
+
+.leaflet-popup-pane {
+	z-index: 700 !important;
+}
+
+/* Fix for Leaflet default controls */
+.leaflet-control-container {
+	position: absolute;
+	z-index: 800;
+}
+
+/* Ensure map tiles load properly */
+.leaflet-tile {
+	visibility: inherit !important;
+}
+
+/* Make sure the map is visible */
+.leaflet-container {
+	height: 100%;
+	width: 100%;
+	background: #f8f8f8;
+}
