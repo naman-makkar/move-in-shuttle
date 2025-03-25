@@ -9,17 +9,21 @@ A comprehensive Next.js application for managing college campus shuttle services
 [![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Database-brightgreen.svg)](https://www.mongodb.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-blue.svg)](https://tailwindcss.com/)
+[![Stripe](https://img.shields.io/badge/Stripe-Payments-purple.svg)](https://stripe.com/)
+[![Leaflet](https://img.shields.io/badge/Leaflet-Maps-green.svg)](https://leafletjs.com/)
 
 ## ✨ Features
 
 ### 👤 User Features
 
 - **🔐 Authentication System**
+
   - User registration and login
   - Profile management
   - Role-based access (students and admins)
 
 - **🎫 Shuttle Booking**
+
   - Browse available shuttle routes
   - Book seats on campus shuttles
   - **Enhanced Booking Flow:** Now using [Zustand](https://github.com/pmndrs/zustand) for client-side state management. The booking search, confirm, and request pages now share state seamlessly for an improved user experience.
@@ -28,31 +32,41 @@ A comprehensive Next.js application for managing college campus shuttle services
   - Cancel bookings
   - Confirm bookings
 
-- **💳 Wallet System**
-  - Add funds to digital wallet
+- **💳 Wallet & Payment System**
+
+  - Add funds to digital wallet via Stripe integration
   - Make payments for shuttle services
   - View transaction history
+  - Secure payment processing
+  - Automatic wallet balance updates
 
 - **🗺️ Route Tracking**
-  - Real-time shuttle tracking
-  - View shuttle schedules
-  - See estimated arrival times
-  - **Improved Google Maps Integration:** The Maps API loader has been centralized to prevent duplicate initialization issues. Check out the demo for route tracking at [https://move-in-shuttle.vercel.app/](https://move-in-shuttle.vercel.app/)
+  - Real-time shuttle tracking with Leaflet maps
+  - Interactive route visualization
+  - User-friendly location selection
+  - Visual pickup and dropoff markers
+  - **Advanced Location Selection:** Improved pickup and dropoff location selection directly from the map interface
+  - **Improved Map Integration:** The Maps API loader has been centralized to prevent duplicate initialization issues
 
 ### 👑 Admin Features
 
 - **🚐 Shuttle Management**
+
   - Add/edit shuttle routes
   - Manage shuttle schedules
   - Monitor shuttle capacity
+  - Track shuttle usage statistics
 
 - **👥 User Management**
+
   - View registered users
   - Manage user roles and permissions
+  - Monitor user activity
 
 - **📋 Booking Oversight**
   - View all bookings
   - Handle cancellations and refunds
+  - Generate reports on booking trends
 
 ## 🔌 API Endpoints
 
@@ -68,11 +82,11 @@ A comprehensive Next.js application for managing college campus shuttle services
 - `GET /api/bookings` - Get all bookings
 - `POST /api/bookings` - Create a new booking
 - `GET /api/bookings/my` - Get bookings for current user  
-  *(For example, fetching from `/api/bookings/my/<userId>`)*
+  _(For example, fetching from `/api/bookings/my/<userId>`)_
 - `GET /api/bookings/search` - Search for available bookings  
-  *(Dynamic server usage handled with `request.nextUrl` and `export const dynamic = "force-dynamic"`.)*
+  _(Dynamic server usage handled with `request.nextUrl` and `export const dynamic = "force-dynamic"`.)_
 - `POST /api/bookings/confirm` - Confirm a pending booking  
-  *Includes wallet balance check, booking record creation, and transaction logging.*
+  _Includes wallet balance check, booking record creation, and transaction logging._
 - `POST /api/bookings/cancel` - Cancel an existing booking
 
 ### 🛣️ Routes
@@ -88,11 +102,13 @@ A comprehensive Next.js application for managing college campus shuttle services
 - `PUT /api/user` - Update user information
 - `GET /api/admin/users` - List all users (admin only)
 
-### 💰 Wallet
+### 💰 Wallet & Payments
 
 - `GET /api/wallet` - Get wallet balance
 - `POST /api/wallet` - Add funds to wallet
 - `GET /api/wallet/transactions` - Get transaction history
+- `POST /api/stripe/create-checkout` - Create a Stripe checkout session
+- `POST /api/stripe/webhook` - Handle Stripe payment webhooks
 
 ## 🛠️ Technologies Used
 
@@ -103,25 +119,30 @@ A comprehensive Next.js application for managing college campus shuttle services
   - Shadcn UI Components
   - React Hook Form with Zod validation
   - **Zustand** for client-side state management (booking flow: request, search, confirm)
-  
 - **⚙️ Backend**:
   - Next.js API Routes
   - NextAuth.js for authentication
   - MongoDB & Mongoose for data storage
   - Bcrypt for password hashing
-  
 - **📍 Maps & Location**:
-  - Google Maps API integration for route visualization
-  - Centralized Maps API loader to prevent duplicate initialization errors
+  - Leaflet maps for interactive mapping
+  - Leaflet Routing Machine for route calculation
+  - Custom marker icons for improved UX
+  - Location-based search functionality
+- **💵 Payment Processing**:
+  - Stripe integration for secure payments
+  - Custom checkout sessions
+  - Webhook handling for payment events
+  - Transaction tracking
 
 ## 💾 Database Models
 
-- **👤 User** - Stores user account details
-- **🎫 Booking** - Manages shuttle bookings
-- **🛣️ Route** - Defines shuttle routes
-- **🚏 Stop** - Defines shuttle stops
-- **🚐 Shuttle** - Shuttle information and availability
-- **💸 Transaction** - Records wallet transactions
+- **👤 User** - Stores user account details, preferences, and authentication information
+- **🎫 Booking** - Manages shuttle bookings with status tracking and payment information
+- **🛣️ Route** - Defines shuttle routes with waypoints and schedule information
+- **🚏 Stop** - Defines shuttle stops with geolocation data and descriptions
+- **🚐 Shuttle** - Shuttle information, capacity, and availability status
+- **💸 Transaction** - Records wallet transactions with detailed payment information
 
 ## 🚀 Getting Started
 
@@ -129,7 +150,8 @@ A comprehensive Next.js application for managing college campus shuttle services
 
 - Node.js 18.0.0 or later
 - MongoDB instance
-- Google Maps API key (for map features)
+- Stripe account for payment processing
+- Google Maps API key (optional, for additional mapping features)
 
 ### ⚙️ Installation
 
@@ -156,10 +178,20 @@ A comprehensive Next.js application for managing college campus shuttle services
    Create a `.env.local` file in the root directory with the following:
 
    ```env
+   # MongoDB Connection
    MONGODB_URI=your_mongodb_connection_string
+
+   # NextAuth Configuration
    NEXTAUTH_SECRET=your_nextauth_secret
    NEXTAUTH_URL=http://localhost:3000
-   GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+
+   # Stripe Integration
+   STRIPE_SECRET_KEY=your_stripe_secret_key
+   STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+
+   # Application URL
+   NEXT_PUBLIC_URL=http://localhost:3000
    ```
 
 4. Run the development server:
@@ -185,13 +217,19 @@ Check out the [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 ## 🔄 Recent Updates
 
-- **Zustand Integration for Booking Flow:**  
-  The booking request, search, and confirm pages now share state via Zustand. This results in a smoother booking flow and easier state management.  
-  **Try the Demo:** [https://move-in-shuttle.vercel.app/](https://move-in-shuttle.vercel.app/)
+- **Advanced Map Interaction:**  
+  Users can now directly select pickup and dropoff locations from the map interface with visual confirmation and location information. This provides a more intuitive booking experience.
 
-- **Centralized Google Maps API Loader:**  
-  We fixed issues with duplicate loader initialization by centralizing the Google Maps API configuration.  
-  **Demo Site:** [https://move-in-shuttle.vercel.app/](https://move-in-shuttle.vercel.app/)
+- **Stripe Payment Integration:**  
+  Complete Stripe payment processing flow with checkout sessions and webhook handling for secure transactions.
+
+- **Zustand State Management:**  
+  The booking request, search, and confirm pages now share state via Zustand for a seamless booking experience without losing user selections between pages.
+- **Enhanced UI Notifications:**  
+  Improved toast notifications provide better feedback throughout the user journey. Custom markers and animations on the map create a more engaging visual experience.
+
+- **Leaflet Maps Integration:**  
+  Switched to Leaflet for maps implementation with custom markers and route visualization. The enhanced map component provides better performance and user experience.
 
 ## 🙏 Acknowledgements
 
@@ -199,10 +237,14 @@ Check out the [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - Shadcn for beautiful UI components
 - Vercel for hosting solutions
 - Zustand for simple and powerful state management
-- Google Maps API for location services
+- Leaflet for comprehensive mapping solutions
+- Stripe for secure payment processing
 
 ## 🙌 Check It Out!
 
 Visit the live demo site now: [https://move-in-shuttle.vercel.app/](https://move-in-shuttle.vercel.app/)  
 Demo Site: [https://move-in-shuttle.vercel.app/](https://move-in-shuttle.vercel.app/)
+
+```
+
 ```
