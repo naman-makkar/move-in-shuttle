@@ -90,6 +90,40 @@ export default function TestingPage() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [selectedRegion, setSelectedRegion] = useState('all');
 	const searchTimeout = useRef(null);
+	const [routeStops, setRouteStops] = useState([
+		{ type: 'pickup', label: 'Pickup Location', coords: null },
+		{ type: 'dropoff', label: 'Final Destination', coords: null }
+	]);
+	const [activeStopIndex, setActiveStopIndex] = useState(0);
+	const [routeData, setRouteData] = useState(null);
+
+	// Handle location selection from map click
+	const handleLocationSelect = (coordinates) => {
+		const [lat, lng] = coordinates;
+		console.log('Selected coordinates:', { lat, lng });
+
+		// Update the active stop with the selected coordinates
+		setRouteStops((stops) =>
+			stops.map((stop, index) =>
+				index === activeStopIndex ? { ...stop, coords: { lat, lng } } : stop
+			)
+		);
+	};
+
+	// Function to remove a stop
+	const removeStop = (index) => {
+		if (index === 0 || index === routeStops.length - 1) return; // Don't remove pickup or final destination
+		setRouteStops((stops) => stops.filter((_, i) => i !== index));
+	};
+
+	// Function to get stop status
+	const getStopStatus = (stop) => {
+		if (!stop.coords) return 'Not set';
+		return (
+			stop.address ||
+			`${stop.coords.lat.toFixed(6)}, ${stop.coords.lng.toFixed(6)}`
+		);
+	};
 
 	// Enhanced search function with better local context
 	const enhanceSearchQuery = (query) => {
@@ -219,6 +253,22 @@ export default function TestingPage() {
 		setSearchQuery(suggestion.display_name);
 		setSuggestions([]);
 
+		// Update the active stop with the selected coordinates
+		setRouteStops((stops) =>
+			stops.map((stop, index) =>
+				index === activeStopIndex
+					? {
+							...stop,
+							coords: {
+								lat: parseFloat(suggestion.lat),
+								lng: parseFloat(suggestion.lon)
+							},
+							address: suggestion.display_name
+					  }
+					: stop
+			)
+		);
+
 		if (map) {
 			map.flyTo(newPosition, 16, {
 				duration: 1.5
@@ -252,10 +302,23 @@ export default function TestingPage() {
 			const data = await response.json();
 
 			if (data.length > 0) {
-				const { lat, lon } = data[0];
+				const { lat, lon, display_name } = data[0];
 				const newPosition = [parseFloat(lat), parseFloat(lon)];
 				setPosition(newPosition);
 				setSuggestions([]);
+
+				// Update the active stop with the selected coordinates
+				setRouteStops((stops) =>
+					stops.map((stop, index) =>
+						index === activeStopIndex
+							? {
+									...stop,
+									coords: { lat: parseFloat(lat), lng: parseFloat(lon) },
+									address: display_name
+							  }
+							: stop
+					)
+				);
 
 				if (map) {
 					map.flyTo(newPosition, 16, {
@@ -273,100 +336,243 @@ export default function TestingPage() {
 		}
 	};
 
+	// Function to add a new stop
+	const addStop = () => {
+		if (routeStops.length >= 5) return; // Maximum 3 stops between pickup and dropoff
+		const newStop = {
+			type: 'stop',
+			label: `Stop ${routeStops.length - 1}`,
+			coords: null
+		};
+		setRouteStops((stops) => [
+			...stops.slice(0, -1), // All except last
+			newStop,
+			...stops.slice(-1) // Last item (dropoff)
+		]);
+	};
+
+	// Function to calculate route when stops change
+	const calculateRoute = async (stops) => {
+		const validStops = stops.filter((stop) => stop.coords);
+		if (validStops.length < 2) return null; // Need at least pickup and dropoff
+
+		try {
+			// Prepare coordinates string for OSRM
+			const coordinates = validStops
+				.map((stop) => `${stop.coords.lng},${stop.coords.lat}`)
+				.join(';');
+
+			const response = await fetch(
+				`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson`
+			);
+			const data = await response.json();
+
+			if (data.code === 'Ok' && data.routes && data.routes[0]) {
+				const route = data.routes[0];
+				setRouteData({
+					geometry: route.geometry,
+					distance: route.distance,
+					duration: route.duration
+				});
+				return route;
+			}
+		} catch (error) {
+			console.error('Error calculating route:', error);
+		}
+		return null;
+	};
+
+	// Update route when stops change
+	useEffect(() => {
+		const validStops = routeStops.filter((stop) => stop.coords);
+		if (validStops.length >= 2) {
+			calculateRoute(validStops);
+		} else {
+			setRouteData(null);
+		}
+	}, [routeStops]);
+
+	// Function to format duration
+	const formatDuration = (seconds) => {
+		const hours = Math.floor(seconds / 3600);
+		const minutes = Math.floor((seconds % 3600) / 60);
+		return hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`;
+	};
+
+	// Function to format distance
+	const formatDistance = (meters) => {
+		const km = (meters / 1000).toFixed(1);
+		return `${km} km`;
+	};
+
 	return (
-		<div className='p-4'>
-			{/* Add global styles for Leaflet */}
-			<style
-				jsx
-				global>
-				{leafletStyles}
-			</style>
-
-			<div className='mb-4 relative'>
-				<form
-					onSubmit={handleSearch}
-					className='flex flex-col gap-2'>
-					{/* Region selector */}
-					<div className='flex gap-2 mb-2'>
-						<select
-							value={selectedRegion}
-							onChange={(e) => setSelectedRegion(e.target.value)}
-							className='p-2 border border-gray-300 rounded'>
-							<option value='all'>All Regions</option>
-							{Object.entries(REGION_BOUNDS.regions).map(([key, region]) => (
-								<option
-									key={key}
-									value={key}>
-									{region.name}
-								</option>
-							))}
-						</select>
-					</div>
-
-					<div className='flex gap-2'>
-						<div className='relative flex-1'>
-							<input
-								type='text'
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								placeholder='Search for locations (e.g., sectors, societies, landmarks...)'
-								className='w-full p-2 border border-gray-300 rounded'
-							/>
-
-							{/* Loading indicator */}
-							{isLoading && (
-								<div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
-									<div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500'></div>
+		<div className='p-4 flex'>
+			{/* Route Selection Panel */}
+			<div className='w-1/3 mr-4 bg-white rounded-lg shadow-lg p-4 z-10 h-[calc(500px+2rem)] overflow-auto'>
+				<h2 className='text-xl font-bold mb-4'>Route Planner</h2>
+				<div className='space-y-4'>
+					{routeStops.map((stop, index) => (
+						<div
+							key={index}
+							className={`p-4 rounded-lg border-2 cursor-pointer transition-all
+								${activeStopIndex === index ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}
+								${
+									stop.type === 'pickup'
+										? 'bg-green-50'
+										: stop.type === 'dropoff'
+										? 'bg-red-50'
+										: 'bg-white'
+								}`}
+							onClick={() => {
+								setActiveStopIndex(index);
+								setSearchQuery('');
+								setSuggestions([]);
+							}}>
+							<div className='flex justify-between items-center'>
+								<div className='flex items-center'>
+									{stop.type === 'pickup' && <span className='mr-2'>🚗</span>}
+									{stop.type === 'stop' && <span className='mr-2'>🔵</span>}
+									{stop.type === 'dropoff' && <span className='mr-2'>📍</span>}
+									<span className='font-medium'>{stop.label}</span>
 								</div>
-							)}
-
-							{/* Suggestions dropdown */}
-							{suggestions.length > 0 && (
-								<div className='absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto'>
-									{suggestions.map((suggestion, index) => (
-										<button
-											key={index}
-											type='button'
-											onClick={() => handleSuggestionClick(suggestion)}
-											className='w-full text-left px-4 py-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none'>
-											<div className='font-medium truncate'>
-												{suggestion.display_name}
-											</div>
-											{suggestion.details && (
-												<div className='text-sm text-gray-500 truncate'>
-													{suggestion.details}
-												</div>
-											)}
-										</button>
-									))}
-								</div>
-							)}
+								{stop.type === 'stop' && (
+									<button
+										onClick={(e) => {
+											e.stopPropagation();
+											removeStop(index);
+										}}
+										className='text-red-500 hover:text-red-700'>
+										✕
+									</button>
+								)}
+							</div>
+							<div className='mt-2 text-sm text-gray-500 break-words'>
+								{getStopStatus(stop)}
+							</div>
 						</div>
+					))}
 
+					{routeStops.length < 5 && (
 						<button
-							type='submit'
-							disabled={isLoading}
-							className='px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed'>
-							Search
+							onClick={addStop}
+							className='w-full p-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors'>
+							+ Add Stop
 						</button>
+					)}
+				</div>
+
+				{routeData && (
+					<div className='mt-4 p-4 bg-gray-50 rounded-lg'>
+						<h3 className='font-medium mb-2'>Route Summary</h3>
+						<div className='space-y-2'>
+							<div className='text-sm text-gray-600'>
+								<span className='font-medium'>Distance:</span>{' '}
+								{formatDistance(routeData.distance)}
+							</div>
+							<div className='text-sm text-gray-600'>
+								<span className='font-medium'>Duration:</span>{' '}
+								{formatDuration(routeData.duration)}
+							</div>
+							<div className='text-sm text-gray-600'>
+								{routeStops.filter((stop) => stop.coords).length} locations
+								selected
+							</div>
+						</div>
 					</div>
-				</form>
+				)}
 			</div>
 
-			{/* Map container with fixed dimensions */}
-			<div
-				style={{
-					height: '500px',
-					width: '100%',
-					position: 'relative',
-					border: '1px solid #ccc',
-					borderRadius: '4px',
-					overflow: 'hidden'
-				}}>
-				<MapWithNoSSR
-					position={position}
-					setMap={setMap}
-				/>
+			{/* Main Content */}
+			<div className='flex-1'>
+				<div className='mb-4 relative'>
+					<form
+						onSubmit={handleSearch}
+						className='flex flex-col gap-2'>
+						{/* Region selector */}
+						<div className='flex gap-2 mb-2'>
+							<select
+								value={selectedRegion}
+								onChange={(e) => setSelectedRegion(e.target.value)}
+								className='p-2 border border-gray-300 rounded'>
+								<option value='all'>All Regions</option>
+								{Object.entries(REGION_BOUNDS.regions).map(([key, region]) => (
+									<option
+										key={key}
+										value={key}>
+										{region.name}
+									</option>
+								))}
+							</select>
+						</div>
+
+						<div className='flex gap-2'>
+							<div className='relative flex-1'>
+								<input
+									type='text'
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+									placeholder='Search for locations (e.g., sectors, societies, landmarks...)'
+									className='w-full p-2 border border-gray-300 rounded'
+								/>
+
+								{/* Loading indicator */}
+								{isLoading && (
+									<div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
+										<div className='animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500'></div>
+									</div>
+								)}
+
+								{/* Suggestions dropdown */}
+								{suggestions.length > 0 && (
+									<div className='absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto'>
+										{suggestions.map((suggestion, index) => (
+											<button
+												key={index}
+												type='button'
+												onClick={() => handleSuggestionClick(suggestion)}
+												className='w-full text-left px-4 py-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none'>
+												<div className='font-medium truncate'>
+													{suggestion.display_name}
+												</div>
+												{suggestion.details && (
+													<div className='text-sm text-gray-500 truncate'>
+														{suggestion.details}
+													</div>
+												)}
+											</button>
+										))}
+									</div>
+								)}
+							</div>
+
+							<button
+								type='submit'
+								disabled={isLoading}
+								className='px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed'>
+								Search
+							</button>
+						</div>
+					</form>
+				</div>
+
+				{/* Map container */}
+				<div
+					style={{
+						height: '500px',
+						width: '100%',
+						position: 'relative',
+						border: '1px solid #ccc',
+						borderRadius: '4px',
+						overflow: 'hidden'
+					}}>
+					<MapWithNoSSR
+						position={position}
+						setMap={setMap}
+						onLocationSelect={handleLocationSelect}
+						routeStops={routeStops}
+						routeData={routeData}
+					/>
+				</div>
 			</div>
 		</div>
 	);
