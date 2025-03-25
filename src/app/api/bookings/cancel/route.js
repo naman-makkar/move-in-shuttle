@@ -5,6 +5,7 @@ import Booking from "@/models/booking";
 import Shuttle from "@/models/shuttle";
 import User from "@/models/user";
 import Transaction from "@/models/transaction";
+import { redis } from "@/lib/redis";
 
 export async function POST(request) {
   try {
@@ -81,6 +82,10 @@ export async function POST(request) {
         description: "Cancellation penalty due to frequent cancellations"
       });
     }
+
+    // Invalidate the Redis cache for this user's bookings
+    const cacheKey = `bookings:${userId}`;
+    await redis.del(cacheKey);
     
     return NextResponse.json({
       success: true,

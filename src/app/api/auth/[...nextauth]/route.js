@@ -39,24 +39,27 @@ const handler = NextAuth({
 				return {
 					id: user.userId, // We'll store userId in the token
 					email: user.email,
-					role: user.role
+					role: user.role,
+					gender: user.gender // Include gender in the token
 				};
 			}
 		})
 	],
 	callbacks: {
 		async jwt({ token, user }) {
-			// When user logs in, attach role and userId to the token
+			// When user logs in, attach role, userId, and gender to the token
 			if (user) {
 				token.userId = user.id;
 				token.role = user.role;
+				token.gender = user.gender; // Include gender in the token
 			}
 			return token;
 		},
 		async session({ session, token }) {
-			// Expose userId and role in the session
+			// Expose userId, role, and gender in the session
 			session.user.userId = token.userId;
 			session.user.role = token.role;
+			session.user.gender = token.gender; // Include gender in the session
 			return session;
 		}
 	},

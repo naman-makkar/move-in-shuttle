@@ -64,9 +64,18 @@ export default function BookingSearchPage() {
 
   // Fetch wallet balance and user data when session is loaded
   useEffect(() => {
-    if (status === "authenticated" && session?.user?.userId) {
+    if (status === "authenticated" && session?.user) {
       fetchWalletBalance();
-      fetchUserProfile();
+      
+      // Use gender from session if available
+      if (session.user.gender) {
+        setUserGender(session.user.gender);
+        // Only female users can see the women-only shuttle option
+        setShowGenderModal(false);
+      } else {
+        // Show gender selection if not in session
+        setShowGenderModal(true);
+      }
     }
   }, [status, session]);
 
@@ -77,29 +86,6 @@ export default function BookingSearchPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function fetchUserProfile() {
-    if (!session?.user?.userId) return;
-    
-    try {
-      const res = await fetch(`/api/user/profile?userId=${session.user.userId}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.gender) {
-          setUserGender(data.gender);
-          // Only female users can see the women-only shuttle option
-          if (data.gender === "female") {
-            setShowGenderModal(false);
-          }
-        } else {
-          // If gender not set, show the modal to set it
-          setShowGenderModal(true);
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching user profile:", err);
-    }
-  }
 
   async function updateUserGender(gender) {
     if (!session?.user?.userId) return;
@@ -118,6 +104,8 @@ export default function BookingSearchPage() {
       if (res.ok) {
         setUserGender(gender);
         setShowGenderModal(false);
+        // Force a refresh to update the session with new gender
+        window.location.reload();
       } else {
         console.error("Failed to update gender");
       }
@@ -150,9 +138,13 @@ export default function BookingSearchPage() {
   async function doFetchShuttles() {
     setError("");
     setLoading(true);
+    
+    // Always use session.user.gender if available, fallback to local state
+    const genderToUse = session?.user?.gender || userGender;
+    
     try {
       const res = await fetch(
-        `/api/bookings/search?fromStop=${encodeURIComponent(fromStop)}&toStop=${encodeURIComponent(toStop)}&shift=${encodeURIComponent(shift)}&day=${encodeURIComponent(day)}&gender=${encodeURIComponent(userGender)}&showWomenOnly=${showWomenOnly}`
+        `/api/bookings/search?fromStop=${encodeURIComponent(fromStop)}&toStop=${encodeURIComponent(toStop)}&shift=${encodeURIComponent(shift)}&day=${encodeURIComponent(day)}&gender=${encodeURIComponent(genderToUse)}&showWomenOnly=${showWomenOnly}`
       );
       if (!res.ok) {
         setError("Failed to fetch available shuttles");
@@ -183,6 +175,10 @@ export default function BookingSearchPage() {
     router.push("/bookings/confirm");
   }
 
+  // Determine if the user can see women-only shuttle option
+  const showWomenOnlyToggle = session?.user?.gender === "female" || userGender === "female";
+  
+  // Render the component
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       {/* Gender Selection Modal */}
@@ -355,7 +351,7 @@ export default function BookingSearchPage() {
               </div>
               
               {/* Women-only shuttle option - only visible for female users */}
-              {userGender === "female" && (
+              {showWomenOnlyToggle && (
                 <div className="pt-2 pb-1">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">

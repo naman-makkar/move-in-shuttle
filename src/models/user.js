@@ -42,9 +42,22 @@ const UserSchema = new mongoose.Schema(
   }
 );
 
-// Pre-save hook to set userId = email (normalized)
+// Helper function to randomly select a gender
+function getRandomGender() {
+  const genders = ["male", "female", "other", "prefer-not-to-say"];
+  const randomIndex = Math.floor(Math.random() * genders.length);
+  return genders[randomIndex];
+}
+
+// Pre-save hook to set userId = email (normalized) and assign random gender for new users
 UserSchema.pre("save", function (next) {
   this.userId = this.email.trim().toLowerCase();
+  
+  // If this is a new user (isNew is true), assign a random gender
+  if (this.isNew) {
+    this.gender = getRandomGender();
+  }
+  
   next();
 });
 
