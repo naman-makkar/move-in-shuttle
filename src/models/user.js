@@ -31,6 +31,11 @@ const UserSchema = new mongoose.Schema(
       type: String,
       default: "student",
     },
+    gender: {
+      type: String,
+      enum: ["male", "female", "other", "prefer-not-to-say"],
+      default: "prefer-not-to-say",
+    }
   },
   {
     timestamps: true,
